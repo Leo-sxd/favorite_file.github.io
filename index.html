@@ -73,8 +73,352 @@
             opacity: 0.8;
         }
 
+        /* 新增：待办事项按钮样式 */
+        .todo-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(65, 105, 225, 0.3);
+            border: 1px solid rgba(65, 105, 225, 0.5);
+            color: #e0e0ff;
+            padding: 10px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            z-index: 1000;
+            font-size: 0.9rem;
+            backdrop-filter: blur(5px);
+        }
+
+        .todo-btn:hover {
+            background: rgba(65, 105, 225, 0.5);
+            border-color: rgba(138, 43, 226, 0.6);
+            box-shadow: 0 0 10px rgba(65, 105, 225, 0.3);
+        }
+
+        /* 待办事项页面样式 */
+        .todo-page {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 10, 30, 0.95);
+            z-index: 2000;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .todo-container {
+            max-width: 800px;
+            margin: 50px auto;
+            background: rgba(20, 20, 40, 0.9);
+            border-radius: 12px;
+            padding: 30px;
+            border: 1px solid rgba(65, 105, 225, 0.3);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+        }
+
+        .todo-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(65, 105, 225, 0.3);
+        }
+
+        .todo-title {
+            font-size: 1.8rem;
+            background: linear-gradient(90deg, #4169e1, #8a2be2);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .close-btn {
+            background: rgba(255, 0, 0, 0.3);
+            border: 1px solid rgba(255, 0, 0, 0.5);
+            color: #ff8080;
+            padding: 8px 15px;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .close-btn:hover {
+            background: rgba(255, 0, 0, 0.5);
+        }
+
+        .todo-form {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .todo-input, .todo-datetime {
+            flex: 1;
+            background: rgba(30, 30, 60, 0.8);
+            border: 1px solid rgba(65, 105, 225, 0.3);
+            border-radius: 8px;
+            padding: 10px;
+            color: #e0e0ff;
+            font-size: 1rem;
+        }
+
+        .todo-input::placeholder {
+            color: #a0a0ff;
+            opacity: 0.7;
+        }
+
+        .add-btn {
+            background: rgba(65, 105, 225, 0.3);
+            border: 1px solid rgba(65, 105, 225, 0.5);
+            color: #e0e0ff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .add-btn:hover {
+            background: rgba(65, 105, 225, 0.5);
+        }
+
+        .todo-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .todo-item {
+            background: rgba(30, 30, 60, 0.7);
+            border: 1px solid rgba(65, 105, 225, 0.2);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+
+        .todo-item:hover {
+            border-color: rgba(65, 105, 225, 0.5);
+        }
+
+        .todo-item-content {
+            flex: 1;
+        }
+
+        .todo-item-title {
+            font-size: 1.1rem;
+            margin-bottom: 5px;
+        }
+
+        .todo-item-time {
+            font-size: 0.9rem;
+            color: #a0a0ff;
+            opacity: 0.8;
+        }
+
+        .delete-btn {
+            background: rgba(255, 0, 0, 0.3);
+            border: 1px solid rgba(255, 0, 0, 0.5);
+            color: #ff8080;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .delete-btn:hover {
+            background: rgba(255, 0, 0, 0.5);
+        }
+
+        /* 提醒弹窗样式 */
+        .reminder-modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(20, 20, 40, 0.95);
+            border: 2px solid rgba(255, 0, 0, 0.5);
+            border-radius: 12px;
+            padding: 30px;
+            z-index: 3000;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 0 30px rgba(255, 0, 0, 0.3);
+        }
+
+        .reminder-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 0, 0, 0.3);
+        }
+
+        .reminder-title {
+            font-size: 1.5rem;
+            color: #ff8080;
+        }
+
+        .reminder-close {
+            background: none;
+            border: none;
+            color: #ff8080;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .reminder-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .reminder-item {
+            background: rgba(255, 0, 0, 0.1);
+            border: 1px solid rgba(255, 0, 0, 0.2);
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        /* 新增：欢迎提醒弹窗样式 */
+        .welcome-modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(20, 20, 40, 0.95);
+            border: 2px solid rgba(65, 105, 225, 0.5);
+            border-radius: 12px;
+            padding: 30px;
+            z-index: 3000;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 0 30px rgba(65, 105, 225, 0.3);
+        }
+
+        .welcome-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(65, 105, 225, 0.3);
+        }
+
+        .welcome-title {
+            font-size: 1.5rem;
+            color: #8a2be2;
+        }
+
+        .welcome-close {
+            background: none;
+            border: none;
+            color: #8a2be2;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .welcome-content {
+            margin-bottom: 20px;
+        }
+
+        .welcome-btn {
+            background: rgba(65, 105, 225, 0.3);
+            border: 1px solid rgba(65, 105, 225, 0.5);
+            color: #e0e0ff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            font-size: 1rem;
+        }
+
+        .welcome-btn:hover {
+            background: rgba(65, 105, 225, 0.5);
+        }
+
+
+        /* 新增：时间显示区域样式 - 关键修改 */
+        .time-display {
+            background: rgba(20, 20, 40, 0.7);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 15px auto 30px; /* 修改了上边距，从0改为15px */
+            max-width: 600px;
+            border: 1px solid rgba(65, 105, 225, 0.3);
+            box-shadow: 0 0 20px rgba(65, 105, 225, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .time-display::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(45deg, transparent, rgba(65, 105, 225, 0.1), transparent);
+            z-index: 0;
+        }
+
+        .time-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            position: relative;
+            z-index: 1;
+        }
+
+        .time-main {
+            font-size: 3.5rem;
+            font-weight: 300;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #e0e0ff, #a0a0ff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-shadow: 0 0 10px rgba(160, 160, 255, 0.5);
+        }
+
+        .time-period {
+            font-size: 1.5rem;
+            margin-left: 10px;
+            color: #8a2be2;
+        }
+
+        .date-info {
+            font-size: 1.2rem;
+            color: #a0a0ff;
+            margin-bottom: 5px;
+        }
+
+        .lunar-info {
+            font-size: 1rem;
+            color: #8080cc;
+            opacity: 0.9;
+        }
+
+        .festival-info {
+            font-size: 1rem;
+            color: #ff8080;
+            margin-top: 5px;
+            font-weight: 500;
+        }
+
         /* =========================
-           ✅ 新增：搜索栏样式
+         新增：搜索栏样式
         ========================== */
         .search-container{
             max-width: 680px;
@@ -263,6 +607,26 @@
             .bookmark {
                 padding: 15px;
             }
+            
+            .todo-btn {
+                top: 10px;
+                left: 10px;
+                padding: 8px 12px;
+                font-size: 0.8rem;
+            }
+            
+            .todo-container {
+                margin: 20px auto;
+                padding: 20px;
+            }
+            
+            .time-main {
+                font-size: 2.5rem;
+            }
+            
+            .date-info {
+                font-size: 1rem;
+            }
         }
 
         /* 科幻装饰元素 */
@@ -303,12 +667,72 @@
     <div class="sci-fi-element" style="top: 50%; left: 60%; animation-delay: 9s;"></div>
     <div class="sci-fi-element" style="top: 20%; left: 50%; animation-delay: 12s;"></div>
 
+    <!-- 待办事项按钮 -->
+    <button class="todo-btn" id="todoBtn">📋 待办事项</button>
+
+    <!-- 待办事项页面 -->
+    <div class="todo-page" id="todoPage">
+        <div class="todo-container">
+            <div class="todo-header">
+                <h2 class="todo-title">待办事项管理</h2>
+                <button class="close-btn" id="closeTodo">关闭</button>
+            </div>
+            
+            <div class="todo-form">
+                <input type="text" class="todo-input" id="todoInput" placeholder="输入待办事项...">
+                <input type="datetime-local" class="todo-datetime" id="todoDatetime">
+                <button class="add-btn" id="addTodo">添加</button>
+            </div>
+            
+            <div class="todo-list" id="todoList">
+                <!-- 待办事项将在这里动态生成 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 提醒弹窗 -->
+    <div class="reminder-modal" id="reminderModal">
+        <div class="reminder-header">
+            <h3 class="reminder-title">🔔 待办事项提醒</h3>
+            <button class="reminder-close" id="closeReminder">×</button>
+        </div>
+        <div class="reminder-list" id="reminderList">
+            <!-- 提醒事项将在这里动态生成 -->
+        </div>
+    </div>
+
+    <!-- 新增：欢迎提醒弹窗 -->
+    <div class="welcome-modal" id="welcomeModal">
+        <div class="welcome-header">
+            <h3 class="welcome-title">📋 待办事项提醒</h3>
+            <button class="welcome-close" id="closeWelcome">×</button>
+        </div>
+        <div class="welcome-content">
+            <p>您有 <span id="pendingCount">0</span> 个待办事项需要处理。</p>
+            <p>点击下方按钮管理您的待办事项。</p>
+        </div>
+        <button class="welcome-btn" id="goToTodo">管理待办事项</button>
+    </div>
+
     <header>
         <h1>跨越星海，终见曙光</h1>
         <p class="subtitle">星云边界</p>
 
+        <!-- 新增：时间显示区域 -->
+        <div class="time-display">
+            <div class="time-container">
+                <div class="time-main">
+                    <span id="current-time">00:00:00</span>
+                    <span class="time-period" id="time-period">AM</span>
+                </div>
+                <div class="date-info" id="current-date">2024年1月1日 星期一</div>
+                <div class="lunar-info" id="lunar-date">农历正月初一</div>
+                <div class="festival-info" id="festival-info">春节</div>
+            </div>
+        </div>
+
         <!-- =========================
-             ✅ 新增：搜索栏
+             新增：搜索栏
         ========================== -->
         <div class="search-container">
             <input id="searchInput" class="search-input" type="text"
@@ -727,18 +1151,367 @@
     </footer>
 
     <script>
-        // 分类筛选功能 - 修复版本
+        // 时间显示功能
+        function updateTime() {
+            const now = new Date();
+            
+            // 获取时间元素
+            const timeElement = document.getElementById('current-time');
+            const periodElement = document.getElementById('time-period');
+            const dateElement = document.getElementById('current-date');
+            const lunarElement = document.getElementById('lunar-date');
+            const festivalElement = document.getElementById('festival-info');
+            
+            // 格式化时间（12小时制）
+            let hours = now.getHours();
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const period = hours >= 12 ? 'PM' : 'AM';
+            
+            // 转换为12小时制
+            hours = hours % 12 || 12;
+            
+            // 更新时间显示
+            timeElement.textContent = `${hours}:${minutes}:${seconds}`;
+            periodElement.textContent = period;
+            
+            // 更新日期显示
+            const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
+            dateElement.textContent = now.toLocaleDateString('zh-CN', options);
+            
+            // 计算农历和节日
+            updateLunarAndFestival(now, lunarElement, festivalElement);
+        }
+        
+        // 农历和节日计算
+        function updateLunarAndFestival(date, lunarElement, festivalElement) {
+            // 简化版的农历和节日计算
+            // 实际应用中可以使用更精确的农历计算库
+            
+            const year = date.getFullYear();
+            const month = date.getMonth() + 1;
+            const day = date.getDate();
+            
+            // 简化农历计算（仅作示例，实际需要更复杂的算法）
+            const lunarInfo = calculateLunar(year, month, day);
+            lunarElement.textContent = `农历${lunarInfo}`;
+            
+            // 节日判断
+            const festival = getFestival(month, day, lunarInfo);
+            festivalElement.textContent = festival || '';
+        }
+        
+        // 简化版农历计算（仅作示例）
+        function calculateLunar(year, month, day) {
+            // 这里使用一个简化的农历日期映射
+            // 实际应用中应该使用更精确的算法或库
+            
+            const lunarMonths = ['正', '二', '三', '四', '五', '六', '七', '八', '九', '十', '冬', '腊'];
+            const lunarDays = ['初一', '初二', '初三', '初四', '初五', '初六', '初七', '初八', '初九', '初十',
+                              '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十',
+                              '廿一', '廿二', '廿三', '廿四', '廿五', '廿六', '廿七', '廿八', '廿九', '三十'];
+            
+            // 简化的农历计算（仅作示例）
+            const lunarMonth = lunarMonths[(month - 1) % 12];
+            const lunarDay = lunarDays[(day - 1) % 30];
+            
+            return `${lunarMonth}月${lunarDay}`;
+        }
+        
+        // 节日判断
+        function getFestival(month, day, lunarInfo) {
+            const festivals = {
+                '0101': '元旦',
+                '0110': '中国人民警察节',
+                '0210': '国际气象节',
+                '0214': '情人节',
+                '0301': '国际海报日',
+                '0305': '学雷锋纪念日',
+                '0308': '妇女节',
+                '0312': '植树节',
+                '0314': '国际数学日',
+                '0321': '世界森林日',
+                '0401': '愚人节',
+                '0405': '清明节',
+                '0407': '世界卫生日',
+                '0412': '载人空间飞行国际日',
+                '0422': '世界地球日',
+                '0423': '世界读书日',
+                '0424': '中国航天日',
+                '0501': '劳动节',
+                '0504': '青年节',
+                '0512': '全国防灾减灾日',
+                '0517': '世界电信日',
+                '0518': '国际博物馆日',
+                '0519': '中国旅游日',
+                '0520': '世界计量日',
+                '0522': '国际生物多样性日',
+                '0530': '全国科技工作者日',
+                '0531': '世界无烟日',
+                '0601': '儿童节',
+                '0605': '世界环境日',
+                '0623': '国际奥林匹克日',
+                '0701': '建党节＆香港回归',
+                '0711': '中国航海日',
+                '0730': '国际友谊日',
+                '0801': '建军节',
+                '0812': '国际青年节',
+                '0903': '中国人民抗日战争胜利纪念日',
+                '0910': '教师节',
+                '0916': '国际臭氧层保护日',
+                '0918': '勿忘历史，吾辈自强',
+                '0921': '国际和平日',
+                '0927': '世界旅游日',
+                '0930': '烈士纪念日',
+                '1001': '国庆节',
+                '1024': '联合国日',
+                '1025': '台湾光复纪念日＆抗美援朝纪念日',
+                '1031': '万圣节',
+                '1108': '中国记者日',
+                '1110': '世界青年节',
+                '1117': '国际大学生节',
+                '1204': '国家宪法日',
+                '1213': '南京大屠杀死难者国家公祭日',
+                '1220': '澳门回归纪念日',
+                '1224': '平安夜',
+                '1225': '圣诞节'
+            };
+            
+            // 农历节日
+            const lunarFestivals = {
+                '正月初一': '春节',
+                '正月十五': '元宵节',
+                '五月初五': '端午节',
+                '七月初七': '七夕',
+                '七月十五': '中元节',
+                '八月十五': '中秋节',
+                '九月初九': '重阳节',
+                '腊月初八': '腊八节',
+                '腊月廿三': '小年',
+                '腊月三十': '除夕'
+            };
+            
+            const key = `${String(month).padStart(2, '0')}${String(day).padStart(2, '0')}`;
+            
+            // 优先返回农历节日
+            if (lunarFestivals[lunarInfo]) {
+                return lunarFestivals[lunarInfo];
+            }
+            
+            return festivals[key] || '';
+        }
+        
+        // 初始化时间显示
+        updateTime();
+        setInterval(updateTime, 1000);
+        
+        // 待办事项功能
         document.addEventListener('DOMContentLoaded', function() {
+            // 待办事项数据
+            let todos = JSON.parse(localStorage.getItem('todos')) || [];
+            let reminderInterval = null;
+            
+            // DOM 元素
+            const todoBtn = document.getElementById('todoBtn');
+            const todoPage = document.getElementById('todoPage');
+            const closeTodo = document.getElementById('closeTodo');
+            const addTodo = document.getElementById('addTodo');
+            const todoInput = document.getElementById('todoInput');
+            const todoDatetime = document.getElementById('todoDatetime');
+            const todoList = document.getElementById('todoList');
+            const reminderModal = document.getElementById('reminderModal');
+            const closeReminder = document.getElementById('closeReminder');
+            const reminderList = document.getElementById('reminderList');
+            const welcomeModal = document.getElementById('welcomeModal');
+            const closeWelcome = document.getElementById('closeWelcome');
+            const goToTodo = document.getElementById('goToTodo');
+            const pendingCount = document.getElementById('pendingCount');
+            
+            // 打开待办事项页面
+            todoBtn.addEventListener('click', function() {
+                todoPage.style.display = 'block';
+                renderTodos();
+            });
+            
+            // 关闭待办事项页面
+            closeTodo.addEventListener('click', function() {
+                todoPage.style.display = 'none';
+            });
+            
+            // 关闭提醒弹窗
+            closeReminder.addEventListener('click', function() {
+                reminderModal.style.display = 'none';
+            });
+            
+            // 关闭欢迎弹窗
+            closeWelcome.addEventListener('click', function() {
+                welcomeModal.style.display = 'none';
+            });
+            
+            // 从欢迎弹窗跳转到待办事项页面
+            goToTodo.addEventListener('click', function() {
+                welcomeModal.style.display = 'none';
+                todoPage.style.display = 'block';
+                renderTodos();
+            });
+            
+            // 添加待办事项
+            addTodo.addEventListener('click', function() {
+                const text = todoInput.value.trim();
+                const datetime = todoDatetime.value;
+                
+                if (text && datetime) {
+                    const todo = {
+                        id: Date.now(),
+                        text: text,
+                        datetime: datetime,
+                        completed: false
+                    };
+                    
+                    todos.push(todo);
+                    saveTodos();
+                    renderTodos();
+                    
+                    // 清空输入框
+                    todoInput.value = '';
+                    todoDatetime.value = '';
+                    
+                    // 重新启动提醒检查
+                    startReminderCheck();
+                }
+            });
+            
+            // 渲染待办事项列表
+            function renderTodos() {
+                todoList.innerHTML = '';
+                
+                if (todos.length === 0) {
+                    todoList.innerHTML = '<p style="text-align: center; color: #a0a0ff; opacity: 0.7;">暂无待办事项</p>';
+                    return;
+                }
+                
+                // 按时间排序
+                todos.sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
+                
+                todos.forEach(todo => {
+                    const todoItem = document.createElement('div');
+                    todoItem.className = 'todo-item';
+                    
+                    const now = new Date();
+                    const todoTime = new Date(todo.datetime);
+                    const timeDiff = todoTime - now;
+                    
+                    // 添加紧急样式（1小时内）
+                    if (timeDiff > 0 && timeDiff < 60 * 60 * 1000) {
+                        todoItem.style.borderColor = 'rgba(255, 0, 0, 0.5)';
+                        todoItem.style.background = 'rgba(255, 0, 0, 0.1)';
+                    }
+                    
+                    todoItem.innerHTML = `
+                        <div class="todo-item-content">
+                            <div class="todo-item-title">${todo.text}</div>
+                            <div class="todo-item-time">截止时间: ${formatDateTime(todo.datetime)}</div>
+                        </div>
+                        <button class="delete-btn" data-id="${todo.id}">删除</button>
+                    `;
+                    
+                    todoList.appendChild(todoItem);
+                });
+                
+                // 添加删除事件
+                document.querySelectorAll('.delete-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const id = parseInt(this.getAttribute('data-id'));
+                        todos = todos.filter(todo => todo.id !== id);
+                        saveTodos();
+                        renderTodos();
+                        startReminderCheck();
+                    });
+                });
+            }
+            
+            // 保存待办事项到本地存储
+            function saveTodos() {
+                localStorage.setItem('todos', JSON.stringify(todos));
+            }
+            
+            // 格式化日期时间显示
+            function formatDateTime(datetimeStr) {
+                const date = new Date(datetimeStr);
+                return date.toLocaleString('zh-CN');
+            }
+            
+            // 检查提醒
+            function checkReminders() {
+                const now = new Date();
+                const dueTodos = todos.filter(todo => {
+                    const todoTime = new Date(todo.datetime);
+                    return !todo.completed && todoTime <= now;
+                });
+                
+                if (dueTodos.length > 0) {
+                    showReminders(dueTodos);
+                }
+            }
+            
+            // 显示提醒弹窗
+            function showReminders(dueTodos) {
+                reminderList.innerHTML = '';
+                
+                dueTodos.forEach(todo => {
+                    const reminderItem = document.createElement('div');
+                    reminderItem.className = 'reminder-item';
+                    reminderItem.innerHTML = `
+                        <strong>${todo.text}</strong><br>
+                        <small>应于: ${formatDateTime(todo.datetime)} 完成</small>
+                    `;
+                    reminderList.appendChild(reminderItem);
+                });
+                
+                reminderModal.style.display = 'block';
+            }
+            
+            // 启动提醒检查
+            function startReminderCheck() {
+                if (reminderInterval) {
+                    clearInterval(reminderInterval);
+                }
+                
+                // 立即检查一次
+                checkReminders();
+                
+                // 每分钟检查一次
+                reminderInterval = setInterval(checkReminders, 60000);
+            }
+            
+            // 显示欢迎弹窗
+            function showWelcomeModal() {
+                // 计算未完成的待办事项数量
+                const pendingTodos = todos.filter(todo => !todo.completed);
+                pendingCount.textContent = pendingTodos.length;
+                
+                // 显示弹窗
+                welcomeModal.style.display = 'block';
+            }
+            
+            // 初始化
+            renderTodos();
+            startReminderCheck();
+            
+            // 页面加载完成后显示欢迎弹窗
+            setTimeout(showWelcomeModal, 500);
+            
+            // 分类筛选功能
             const categoryBtns = document.querySelectorAll('.category-btn');
             const categoryContainers = document.querySelectorAll('.category-container');
 
-            // ✅ 新增：搜索输入框
+            // 搜索输入框
             const searchInput = document.getElementById('searchInput');
 
             // 当前激活分类（用于搜索框为空时回退）
             let activeCategory = 'all';
             
-            // 显示特定分类 - 修复后的逻辑
+            // 显示特定分类
             function showCategory(category) {
                 categoryContainers.forEach(container => {
                     if (category === 'all') {
@@ -753,7 +1526,7 @@
                 });
             }
 
-            // ✅ 新增：搜索逻辑
+            // 搜索逻辑
             function applySearch(keyword) {
                 const q = keyword.trim().toLowerCase();
 
@@ -807,7 +1580,7 @@
                 });
             });
 
-            // ✅ 新增：监听搜索输入
+            // 监听搜索输入
             searchInput.addEventListener('input', function(){
                 applySearch(this.value);
             });
