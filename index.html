@@ -151,9 +151,11 @@
             background: rgba(255, 0, 0, 0.5);
         }
 
+        /* 修改后的待办事项表单样式 */
         .todo-form {
             display: flex;
-            gap: 10px;
+            flex-direction: column; /* 改为垂直布局 */
+            gap: 15px; /* 增加间距 */
             margin-bottom: 20px;
         }
 
@@ -162,9 +164,10 @@
             background: rgba(30, 30, 60, 0.8);
             border: 1px solid rgba(65, 105, 225, 0.3);
             border-radius: 8px;
-            padding: 10px;
+            padding: 12px; /* 增加内边距 */
             color: #e0e0ff;
             font-size: 1rem;
+            width: 100%; /* 确保输入框占满宽度 */
         }
 
         .todo-input::placeholder {
@@ -176,14 +179,20 @@
             background: rgba(65, 105, 225, 0.3);
             border: 1px solid rgba(65, 105, 225, 0.5);
             color: #e0e0ff;
-            padding: 10px 20px;
+            padding: 12px 30px; /* 增加内边距 */
             border-radius: 8px;
             cursor: pointer;
             transition: all 0.3s ease;
+            width: 200px; /* 设置固定宽度 */
+            margin: 0 auto; /* 水平居中 */
+            font-size: 1.1rem; /* 增大字体 */
+            display: block; /* 确保按钮独占一行 */
         }
 
         .add-btn:hover {
             background: rgba(65, 105, 225, 0.5);
+            transform: translateY(-2px); /* 添加悬停效果 */
+            box-shadow: 0 4px 12px rgba(65, 105, 225, 0.3);
         }
 
         .todo-list {
