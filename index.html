@@ -1707,6 +1707,15 @@
 // 初始化显示所有分类
             showCategory('all');
             
+            // 配置DeepSeek API
+            const DEEPSEEK_CONFIG = {
+                apiKey: '', // 这里填入你的DeepSeek API Key
+                baseUrl: 'https://api.deepseek.com',
+                model: 'deepseek-chat',
+                temperature: 0.7,
+                maxTokens: 1000
+            };
+
             // AI服务类
             class AIService {
                 constructor() {
@@ -1714,7 +1723,7 @@
                 }
 
                 // 分析待办事项并提供智能建议
-                analyzeTodos(todos) {
+                async analyzeTodos(todos) {
                     this.suggestions = [];
                     
                     const now = new Date();
@@ -1739,7 +1748,80 @@
                     // 优先级分析
                     this.analyzePriority(pendingTodos, now);
                     
+                    // 如果启用了DeepSeek API，获取AI增强建议
+                    if (DEEPSEEK_CONFIG.apiKey) {
+                        await this.getAIEnhancedSuggestions(todos);
+                    }
+                    
                     return this.suggestions.sort((a, b) => b.confidence - a.confidence);
+                }
+
+                // 调用DeepSeek API获取增强建议
+                async getAIEnhancedSuggestions(todos) {
+                    try {
+                        const systemPrompt = `你是一个专业的任务管理助手。请分析以下待办事项并提供智能建议：
+
+待办事项列表:
+${JSON.stringify(todos, null, 2)}
+
+请提供：
+1. 时间管理建议（哪些任务需要优先处理）
+2. 任务分类建议
+3. 工作效率提升建议
+4. 任何其他有价值的观察
+
+请用中文回复，格式为简短的建议点。`;
+
+                        const aiResponse = await this.callDeepSeekAPI([
+                            { role: 'system', content: '你是一个专业的时间管理和生产力助手。' },
+                            { role: 'user', content: systemPrompt }
+                        ]);
+
+                        if (aiResponse) {
+                            this.suggestions.push({
+                                type: 'ai_enhanced',
+                                title: '🤖 AI深度分析',
+                                message: aiResponse,
+                                confidence: 0.95
+                            });
+                        }
+                    } catch (error) {
+                        console.error('DeepSeek API调用失败:', error);
+                    }
+                }
+
+                // 调用DeepSeek API
+                async callDeepSeekAPI(messages) {
+                    if (!DEEPSEEK_CONFIG.apiKey) {
+                        console.warn('DeepSeek API Key未配置');
+                        return null;
+                    }
+
+                    try {
+                        const response = await fetch(`${DEEPSEEK_CONFIG.baseUrl}/chat/completions`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${DEEPSEEK_CONFIG.apiKey}`
+                            },
+                            body: JSON.stringify({
+                                model: DEEPSEEK_CONFIG.model,
+                                messages: messages,
+                                temperature: DEEPSEEK_CONFIG.temperature,
+                                max_tokens: DEEPSEEK_CONFIG.maxTokens
+                            })
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(`API请求失败: ${response.status}`);
+                        }
+
+                        const data = await response.json();
+                        return data.choices[0]?.message?.content || null;
+                    } catch (error) {
+                        console.error('调用DeepSeek API时出错:', error);
+                        return null;
+                    }
                 }
 
                 analyzeTimeManagement(todos, now) {
@@ -1847,6 +1929,9 @@
                     
                     // 创建AI助手面板
                     this.createAIPanel();
+                    
+                    // 创建API配置面板
+                    this.createAPIConfigPanel();
                 }
 
                 createAIBtn() {
@@ -1854,7 +1939,6 @@
                     aiBtn.id = 'aiAssistantBtn';
                     aiBtn.innerHTML = '🤖 AI助手';
                     
-                    // 修复：使用更简洁的样式，避免覆盖整个屏幕
                     Object.assign(aiBtn.style, {
                         position: 'fixed',
                         bottom: '20px',
@@ -1869,13 +1953,13 @@
                         fontWeight: 'bold',
                         cursor: 'pointer',
                         boxShadow: '0 4px 15px rgba(102, 126, 234, 0.5)',
-                        width: 'auto', // 修复：移除固定宽度
-                        height: 'auto', // 修复：移除固定高度
-                        minWidth: '100px', // 添加最小宽度
-                        maxWidth: '150px', // 添加最大宽度
-                        whiteSpace: 'nowrap', // 防止文字换行
-                        overflow: 'hidden', // 防止文字溢出
-                        textOverflow: 'ellipsis' // 文字溢出显示省略号
+                        width: 'auto',
+                        height: 'auto',
+                        minWidth: '100px',
+                        maxWidth: '150px',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
                     });
                     
                     aiBtn.addEventListener('click', () => {
@@ -1907,9 +1991,29 @@
                         backdropFilter: 'blur(10px)'
                     });
                     
+                    const isAPIEnabled = !!DEEPSEEK_CONFIG.apiKey;
+                    const apiStatus = isAPIEnabled ? 
+                        '<span style="color: #4CAF50; font-size: 12px;">● 已连接</span>' : 
+                        '<span style="color: #ff6b6b; font-size: 12px;">● 未连接</span>';
+                    
                     aiPanel.innerHTML = `
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                            <h2 style="margin: 0; color: #8a2be2; font-size: 20px;">🤖 智能助手</h2>
+                            <div>
+                                <h2 style="margin: 0; color: #8a2be2; font-size: 20px;">🤖 智能助手</h2>
+                                <div style="font-size: 12px; color: #888; margin-top: 5px;">
+                                    ${apiStatus} 
+                                    <button id="configureAPI" style="
+                                        background: transparent;
+                                        border: 1px solid #4169e1;
+                                        color: #4169e1;
+                                        padding: 2px 8px;
+                                        border-radius: 3px;
+                                        cursor: pointer;
+                                        font-size: 10px;
+                                        margin-left: 10px;
+                                    ">配置API</button>
+                                </div>
+                            </div>
                             <button id="closeAIPanel" style="
                                 background: rgba(65, 105, 225, 0.2);
                                 border: 1px solid #4169e1;
@@ -1928,9 +2032,9 @@
                         </div>
                         
                         <div id="aiChatSection" style="margin-top: 20px;">
-                            <h3 style="color: #8a2be2; margin-bottom: 10px; font-size: 16px;">💬 智能问答</h3>
+                            <h3 style="color: #8a2be2; margin-bottom: 10px; font-size: 16px;">💬 AI聊天 (DeepSeek)</h3>
                             <div style="margin-bottom: 10px;">
-                                <input type="text" id="aiQueryInput" placeholder="问我关于待办事项的问题..." style="
+                                <input type="text" id="aiQueryInput" placeholder="问我关于待办事项的任何问题..." style="
                                     width: 100%;
                                     padding: 10px;
                                     background: rgba(30, 30, 60, 0.8);
@@ -1971,25 +2075,242 @@
                         this.handleQuery();
                     });
                     
+                    document.getElementById('configureAPI').addEventListener('click', () => {
+                        this.showAPIConfigPanel();
+                    });
+                    
                     document.getElementById('aiQueryInput').addEventListener('keypress', (e) => {
                         if (e.key === 'Enter') {
                             this.handleQuery();
                         }
                     });
                     
-                    // 添加关闭面板的ESC键支持
                     document.addEventListener('keydown', (e) => {
                         if (e.key === 'Escape') {
                             this.hideAIPanel();
                         }
                     });
                     
-                    // 点击面板外部关闭
                     aiPanel.addEventListener('click', (e) => {
                         if (e.target === aiPanel) {
                             this.hideAIPanel();
                         }
                     });
+                }
+
+                createAPIConfigPanel() {
+                    const configPanel = document.createElement('div');
+                    configPanel.id = 'apiConfigPanel';
+                    
+                    Object.assign(configPanel.style, {
+                        position: 'fixed',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        width: '90%',
+                        maxWidth: '500px',
+                        backgroundColor: 'rgba(20, 20, 40, 0.98)',
+                        border: '2px solid #4CAF50',
+                        borderRadius: '10px',
+                        padding: '20px',
+                        zIndex: '1002',
+                        display: 'none',
+                        color: '#e0e0ff',
+                        boxShadow: '0 0 30px rgba(76, 175, 80, 0.3)',
+                        backdropFilter: 'blur(10px)'
+                    });
+                    
+                    const currentAPIKey = localStorage.getItem('deepseek_api_key') || DEEPSEEK_CONFIG.apiKey;
+                    
+                    configPanel.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <h2 style="margin: 0; color: #4CAF50; font-size: 20px;">🔑 DeepSeek API 配置</h2>
+                            <button id="closeConfigPanel" style="
+                                background: rgba(76, 175, 80, 0.2);
+                                border: 1px solid #4CAF50;
+                                color: #e0e0ff;
+                                padding: 8px 15px;
+                                border-radius: 5px;
+                                cursor: pointer;
+                                font-size: 12px;
+                            ">关闭</button>
+                        </div>
+                        
+                        <div style="margin-bottom: 20px;">
+                            <label style="display: block; margin-bottom: 8px; color: #aaa; font-size: 14px;">
+                                API Key
+                            </label>
+                            <input type="password" id="apiKeyInput" value="${currentAPIKey}" placeholder="输入您的DeepSeek API Key" style="
+                                width: 100%;
+                                padding: 12px;
+                                background: rgba(30, 30, 60, 0.8);
+                                border: 1px solid rgba(76, 175, 80, 0.3);
+                                border-radius: 5px;
+                                color: #e0e0ff;
+                                font-size: 14px;
+                            ">
+                            <div style="font-size: 12px; color: #888; margin-top: 8px;">
+                                获取API Key: 
+                                <a href="https://platform.deepseek.com/api_keys" target="_blank" style="color: #4CAF50;">
+                                    https://platform.deepseek.com/api_keys
+                                </a>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-bottom: 20px;">
+                            <label style="display: block; margin-bottom: 8px; color: #aaa; font-size: 14px;">
+                                模型选择
+                            </label>
+                            <select id="modelSelect" style="
+                                width: 100%;
+                                padding: 12px;
+                                background: rgba(30, 30, 60, 0.8);
+                                border: 1px solid rgba(76, 175, 80, 0.3);
+                                border-radius: 5px;
+                                color: #e0e0ff;
+                                font-size: 14px;
+                            ">
+                                <option value="deepseek-chat" ${DEEPSEEK_CONFIG.model === 'deepseek-chat' ? 'selected' : ''}>deepseek-chat</option>
+                                <option value="deepseek-coder" ${DEEPSEEK_CONFIG.model === 'deepseek-coder' ? 'selected' : ''}>deepseek-coder</option>
+                            </select>
+                        </div>
+                        
+                        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                            <button id="testAPIButton" style="
+                                background: rgba(33, 150, 243, 0.2);
+                                border: 1px solid #2196F3;
+                                color: #e0e0ff;
+                                padding: 10px 20px;
+                                border-radius: 5px;
+                                cursor: pointer;
+                                font-size: 14px;
+                            ">测试连接</button>
+                            <button id="saveAPIButton" style="
+                                background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
+                                border: none;
+                                color: white;
+                                padding: 10px 20px;
+                                border-radius: 5px;
+                                cursor: pointer;
+                                font-size: 14px;
+                                font-weight: bold;
+                            ">保存配置</button>
+                        </div>
+                        
+                        <div id="testResult" style="
+                            margin-top: 20px;
+                            padding: 10px;
+                            border-radius: 5px;
+                            display: none;
+                        "></div>
+                    `;
+
+                    document.body.appendChild(configPanel);
+                    
+                    // 配置面板事件监听
+                    document.getElementById('closeConfigPanel').addEventListener('click', () => {
+                        this.hideAPIConfigPanel();
+                    });
+                    
+                    document.getElementById('saveAPIButton').addEventListener('click', () => {
+                        this.saveAPIConfig();
+                    });
+                    
+                    document.getElementById('testAPIButton').addEventListener('click', () => {
+                        this.testAPIConnection();
+                    });
+                    
+                    configPanel.addEventListener('click', (e) => {
+                        if (e.target === configPanel) {
+                            this.hideAPIConfigPanel();
+                        }
+                    });
+                }
+
+                showAPIConfigPanel() {
+                    const panel = document.getElementById('apiConfigPanel');
+                    panel.style.display = 'block';
+                }
+
+                hideAPIConfigPanel() {
+                    const panel = document.getElementById('apiConfigPanel');
+                    panel.style.display = 'none';
+                }
+
+                async saveAPIConfig() {
+                    const apiKey = document.getElementById('apiKeyInput').value.trim();
+                    const model = document.getElementById('modelSelect').value;
+                    
+                    if (!apiKey) {
+                        alert('请输入API Key');
+                        return;
+                    }
+                    
+                    // 保存到localStorage
+                    localStorage.setItem('deepseek_api_key', apiKey);
+                    localStorage.setItem('deepseek_model', model);
+                    
+                    // 更新全局配置
+                    DEEPSEEK_CONFIG.apiKey = apiKey;
+                    DEEPSEEK_CONFIG.model = model;
+                    
+                    // 显示成功消息
+                    const testResult = document.getElementById('testResult');
+                    testResult.style.display = 'block';
+                    testResult.style.background = 'rgba(76, 175, 80, 0.2)';
+                    testResult.style.border = '1px solid #4CAF50';
+                    testResult.style.color = '#4CAF50';
+                    testResult.innerHTML = '✅ 配置保存成功！';
+                    
+                    // 刷新AI面板状态
+                    setTimeout(() => {
+                        this.hideAPIConfigPanel();
+                        this.hideAIPanel();
+                        setTimeout(() => this.showAIPanel(), 100);
+                    }, 1500);
+                }
+
+                async testAPIConnection() {
+                    const apiKey = document.getElementById('apiKeyInput').value.trim();
+                    const testResult = document.getElementById('testResult');
+                    
+                    if (!apiKey) {
+                        testResult.style.display = 'block';
+                        testResult.style.background = 'rgba(244, 67, 54, 0.2)';
+                        testResult.style.border = '1px solid #F44336';
+                        testResult.style.color = '#F44336';
+                        testResult.innerHTML = '❌ 请输入API Key进行测试';
+                        return;
+                    }
+                    
+                    testResult.style.display = 'block';
+                    testResult.style.background = 'rgba(255, 193, 7, 0.2)';
+                    testResult.style.border = '1px solid #FFC107';
+                    testResult.style.color = '#FFC107';
+                    testResult.innerHTML = '🔄 正在测试连接...';
+                    
+                    try {
+                        const response = await fetch(`${DEEPSEEK_CONFIG.baseUrl}/models`, {
+                            method: 'GET',
+                            headers: {
+                                'Authorization': `Bearer ${apiKey}`
+                            }
+                        });
+                        
+                        if (response.ok) {
+                            testResult.style.background = 'rgba(76, 175, 80, 0.2)';
+                            testResult.style.border = '1px solid #4CAF50';
+                            testResult.style.color = '#4CAF50';
+                            testResult.innerHTML = '✅ 连接测试成功！API Key有效。';
+                        } else {
+                            throw new Error(`API返回错误: ${response.status}`);
+                        }
+                    } catch (error) {
+                        testResult.style.background = 'rgba(244, 67, 54, 0.2)';
+                        testResult.style.border = '1px solid #F44336';
+                        testResult.style.color = '#F44336';
+                        testResult.innerHTML = `❌ 连接测试失败: ${error.message}`;
+                    }
                 }
 
                 toggleAIPanel() {
@@ -2012,47 +2333,87 @@
                     panel.style.display = 'none';
                 }
 
-                updateSuggestions() {
+                async updateSuggestions() {
                     const todos = JSON.parse(localStorage.getItem('todos')) || [];
-                    const suggestions = this.aiService.analyzeTodos(todos);
                     const suggestionsContainer = document.getElementById('suggestionsContainer');
                     
-                    suggestionsContainer.innerHTML = '';
+                    // 显示加载中
+                    suggestionsContainer.innerHTML = `
+                        <div style="text-align: center; padding: 20px; color: #888;">
+                            <div style="margin-bottom: 10px;">🔄 分析中...</div>
+                            <div style="font-size: 12px;">${DEEPSEEK_CONFIG.apiKey ? '正在调用DeepSeek API...' : '使用本地分析...'}</div>
+                        </div>
+                    `;
                     
-                    if (suggestions.length === 0) {
-                        suggestionsContainer.innerHTML = '<p style="color: #888; text-align: center; padding: 20px;">暂无建议，一切正常！</p>';
-                        return;
-                    }
-                    
-                    suggestions.forEach(suggestion => {
-                        const suggestionEl = document.createElement('div');
-                        Object.assign(suggestionEl.style, {
-                            background: 'rgba(65, 105, 225, 0.1)',
-                            borderRadius: '8px',
-                            padding: '10px',
-                            marginBottom: '10px',
-                            borderLeft: '3px solid #4169e1',
-                            transition: 'all 0.3s'
-                        });
+                    try {
+                        const suggestions = await this.aiService.analyzeTodos(todos);
                         
-                        suggestionEl.innerHTML = `
-                            <strong style="color: #e0e0ff; font-size: 14px; display: block; margin-bottom: 5px;">${suggestion.title}</strong>
-                            <p style="margin: 5px 0 0 0; color: #aaa; font-size: 12px;">${suggestion.message}</p>
+                        suggestionsContainer.innerHTML = '';
+                        
+                        if (suggestions.length === 0) {
+                            suggestionsContainer.innerHTML = '<p style="color: #888; text-align: center; padding: 20px;">暂无建议，一切正常！</p>';
+                            return;
+                        }
+                        
+                        suggestions.forEach(suggestion => {
+                            const suggestionEl = document.createElement('div');
+                            Object.assign(suggestionEl.style, {
+                                background: suggestion.type === 'ai_enhanced' ? 
+                                    'rgba(138, 43, 226, 0.1)' : 
+                                    'rgba(65, 105, 225, 0.1)',
+                                borderRadius: '8px',
+                                padding: '10px',
+                                marginBottom: '10px',
+                                borderLeft: suggestion.type === 'ai_enhanced' ? 
+                                    '3px solid #8a2be2' : 
+                                    '3px solid #4169e1',
+                                transition: 'all 0.3s'
+                            });
+                            
+                            suggestionEl.innerHTML = `
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <strong style="color: #e0e0ff; font-size: 14px;">${suggestion.title}</strong>
+                                    ${suggestion.type === 'ai_enhanced' ? 
+                                        '<span style="font-size: 10px; color: #8a2be2; background: rgba(138, 43, 226, 0.2); padding: 2px 6px; border-radius: 3px;">AI增强</span>' : 
+                                        ''}
+                                </div>
+                                <p style="margin: 5px 0 0 0; color: #aaa; font-size: 12px; white-space: pre-wrap;">${suggestion.message}</p>
+                            `;
+                            
+                            suggestionEl.addEventListener('mouseenter', () => {
+                                suggestionEl.style.background = suggestion.type === 'ai_enhanced' ? 
+                                    'rgba(138, 43, 226, 0.2)' : 
+                                    'rgba(65, 105, 225, 0.2)';
+                            });
+                            
+                            suggestionEl.addEventListener('mouseleave', () => {
+                                suggestionEl.style.background = suggestion.type === 'ai_enhanced' ? 
+                                    'rgba(138, 43, 226, 0.1)' : 
+                                    'rgba(65, 105, 225, 0.1)';
+                            });
+                            
+                            suggestionsContainer.appendChild(suggestionEl);
+                        });
+                    } catch (error) {
+                        suggestionsContainer.innerHTML = `
+                            <div style="color: #ff6b6b; text-align: center; padding: 20px;">
+                                <p>分析失败: ${error.message}</p>
+                                <button onclick="window.location.reload()" style="
+                                    background: rgba(255, 107, 107, 0.2);
+                                    border: 1px solid #ff6b6b;
+                                    color: #ff6b6b;
+                                    padding: 5px 10px;
+                                    border-radius: 3px;
+                                    cursor: pointer;
+                                    font-size: 12px;
+                                    margin-top: 10px;
+                                ">重试</button>
+                            </div>
                         `;
-                        
-                        suggestionEl.addEventListener('mouseenter', () => {
-                            suggestionEl.style.background = 'rgba(65, 105, 225, 0.2)';
-                        });
-                        
-                        suggestionEl.addEventListener('mouseleave', () => {
-                            suggestionEl.style.background = 'rgba(65, 105, 225, 0.1)';
-                        });
-                        
-                        suggestionsContainer.appendChild(suggestionEl);
-                    });
+                    }
                 }
 
-                handleQuery() {
+                async handleQuery() {
                     const input = document.getElementById('aiQueryInput');
                     const query = input.value.trim();
                     const messages = document.getElementById('chatMessages');
@@ -2063,15 +2424,51 @@
                     this.addMessage('user', query);
                     input.value = '';
                     
-                    // 模拟AI思考
-                    setTimeout(() => {
+                    // 禁用发送按钮
+                    const sendBtn = document.getElementById('sendQueryBtn');
+                    sendBtn.disabled = true;
+                    sendBtn.innerHTML = '思考中...';
+                    
+                    try {
                         const todos = JSON.parse(localStorage.getItem('todos')) || [];
-                        const response = this.generateSmartResponse(query, todos);
-                        this.addMessage('ai', response);
-                    }, 500);
+                        
+                        if (!DEEPSEEK_CONFIG.apiKey) {
+                            // 使用本地响应
+                            setTimeout(() => {
+                                const response = this.generateLocalResponse(query, todos);
+                                this.addMessage('ai', response);
+                                sendBtn.disabled = false;
+                                sendBtn.innerHTML = '发送';
+                            }, 500);
+                        } else {
+                            // 使用DeepSeek API
+                            const systemPrompt = `你是一个专业的时间管理和待办事项助手。请根据用户的待办事项列表回答问题。
+
+当前待办事项:
+${JSON.stringify(todos, null, 2)}
+
+用户问题: ${query}
+
+请用专业、有帮助的中文回答，如果涉及具体任务，请提供具体建议。`;
+
+                            const aiResponse = await this.aiService.callDeepSeekAPI([
+                                { role: 'system', content: '你是一个专业的时间管理和生产力助手，用中文回答。' },
+                                { role: 'user', content: systemPrompt }
+                            ]);
+                            
+                            this.addMessage('ai', aiResponse || '抱歉，暂时无法回答这个问题。');
+                            sendBtn.disabled = false;
+                            sendBtn.innerHTML = '发送';
+                        }
+                    } catch (error) {
+                        console.error('处理查询时出错:', error);
+                        this.addMessage('ai', '抱歉，AI服务暂时不可用。');
+                        sendBtn.disabled = false;
+                        sendBtn.innerHTML = '发送';
+                    }
                 }
                 
-                generateSmartResponse(query, todos) {
+                generateLocalResponse(query, todos) {
                     const lowercaseQuery = query.toLowerCase();
                     const pendingTodos = todos.filter(todo => !todo.completed);
                     
@@ -2177,6 +2574,12 @@
                     messages.scrollTop = messages.scrollHeight;
                 }
             }
+
+            // 初始化时加载保存的API配置
+            const savedAPIKey = localStorage.getItem('deepseek_api_key');
+            const savedModel = localStorage.getItem('deepseek_model');
+            if (savedAPIKey) DEEPSEEK_CONFIG.apiKey = savedAPIKey;
+            if (savedModel) DEEPSEEK_CONFIG.model = savedModel;
 
             // 在现有代码中添加AI助手初始化
             setTimeout(() => {
