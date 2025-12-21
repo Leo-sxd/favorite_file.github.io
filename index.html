@@ -1704,8 +1704,484 @@
                 });
             });
             
-            // 初始化显示所有分类
+// 初始化显示所有分类
             showCategory('all');
+            
+            // AI服务类
+            class AIService {
+                constructor() {
+                    this.suggestions = [];
+                }
+
+                // 分析待办事项并提供智能建议
+                analyzeTodos(todos) {
+                    this.suggestions = [];
+                    
+                    const now = new Date();
+                    const pendingTodos = todos.filter(todo => !todo.completed);
+                    
+                    if (pendingTodos.length === 0) {
+                        this.suggestions.push({
+                            type: 'encouragement',
+                            title: '🎉 恭喜！',
+                            message: '您目前没有待办事项，继续保持高效！',
+                            confidence: 0.9
+                        });
+                        return this.suggestions;
+                    }
+
+                    // 时间管理分析
+                    this.analyzeTimeManagement(pendingTodos, now);
+                    
+                    // 任务分类分析
+                    this.analyzeCategorization(pendingTodos);
+                    
+                    // 优先级分析
+                    this.analyzePriority(pendingTodos, now);
+                    
+                    return this.suggestions.sort((a, b) => b.confidence - a.confidence);
+                }
+
+                analyzeTimeManagement(todos, now) {
+                    let urgentCount = 0;
+                    let todayCount = 0;
+                    
+                    todos.forEach(todo => {
+                        const todoTime = new Date(todo.datetime);
+                        const timeDiff = todoTime - now;
+                        const hoursDiff = timeDiff / (1000 * 60 * 60);
+                        
+                        if (hoursDiff < 2 && hoursDiff > 0) {
+                            urgentCount++;
+                        }
+                        
+                        if (this.isSameDay(todoTime, now)) {
+                            todayCount++;
+                        }
+                    });
+                    
+                    if (urgentCount > 0) {
+                        this.suggestions.push({
+                            type: 'time_management',
+                            title: '⏰ 紧急提醒',
+                            message: `您有${urgentCount}个任务将在2小时内到期，建议优先处理`,
+                            confidence: 0.9
+                        });
+                    }
+                    
+                    if (todayCount >= 5) {
+                        this.suggestions.push({
+                            type: 'time_management',
+                            title: '📅 任务密集',
+                            message: `今天有${todayCount}个待办事项，建议合理安排时间`,
+                            confidence: 0.7
+                        });
+                    }
+                }
+
+                analyzeCategorization(todos) {
+                    const categories = {};
+                    const keywords = {
+                        '会议': ['会议', '开会', '讨论'],
+                        '学习': ['学习', '阅读', '复习', '作业'],
+                        '工作': ['工作', '项目', '报告', '任务'],
+                        '生活': ['购物', '健身', '打扫', '预约']
+                    };
+                    
+                    todos.forEach(todo => {
+                        Object.keys(keywords).forEach(category => {
+                            keywords[category].forEach(keyword => {
+                                if (todo.text.includes(keyword)) {
+                                    categories[category] = (categories[category] || 0) + 1;
+                                }
+                            });
+                        });
+                    });
+                    
+                    Object.keys(categories).forEach(category => {
+                        if (categories[category] >= 3) {
+                            this.suggestions.push({
+                                type: 'categorization',
+                                title: '🏷️ 分类建议',
+                                message: `检测到多个"${category}"相关任务，建议集中处理`,
+                                confidence: 0.8
+                            });
+                        }
+                    });
+                }
+
+                analyzePriority(todos, now) {
+                    const highPriority = todos.filter(todo => {
+                        const todoTime = new Date(todo.datetime);
+                        const timeDiff = todoTime - now;
+                        return timeDiff < 24 * 60 * 60 * 1000; // 24小时内
+                    });
+                    
+                    if (highPriority.length >= 3) {
+                        this.suggestions.push({
+                            type: 'priority',
+                            title: '🚨 高优先级',
+                            message: `有${highPriority.length}个任务将在24小时内到期，建议优先安排`,
+                            confidence: 0.85
+                        });
+                    }
+                }
+
+                isSameDay(date1, date2) {
+                    return date1.getFullYear() === date2.getFullYear() &&
+                           date1.getMonth() === date2.getMonth() &&
+                           date1.getDate() === date2.getDate();
+                }
+            }
+
+            // 智能助手界面管理
+            class AIAssistant {
+                constructor() {
+                    this.aiService = new AIService();
+                    this.setupAIAssistant();
+                }
+
+                setupAIAssistant() {
+                    // 创建AI助手按钮
+                    this.createAIBtn();
+                    
+                    // 创建AI助手面板
+                    this.createAIPanel();
+                }
+
+                createAIBtn() {
+                    const aiBtn = document.createElement('button');
+                    aiBtn.id = 'aiAssistantBtn';
+                    aiBtn.innerHTML = '🤖 AI助手';
+                    
+                    // 修复：使用更简洁的样式，避免覆盖整个屏幕
+                    Object.assign(aiBtn.style, {
+                        position: 'fixed',
+                        bottom: '20px',
+                        right: '20px',
+                        zIndex: '1000',
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        border: 'none',
+                        borderRadius: '25px',
+                        color: 'white',
+                        padding: '10px 20px',
+                        fontSize: '14px',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 15px rgba(102, 126, 234, 0.5)',
+                        width: 'auto', // 修复：移除固定宽度
+                        height: 'auto', // 修复：移除固定高度
+                        minWidth: '100px', // 添加最小宽度
+                        maxWidth: '150px', // 添加最大宽度
+                        whiteSpace: 'nowrap', // 防止文字换行
+                        overflow: 'hidden', // 防止文字溢出
+                        textOverflow: 'ellipsis' // 文字溢出显示省略号
+                    });
+                    
+                    aiBtn.addEventListener('click', () => {
+                        this.toggleAIPanel();
+                    });
+
+                    document.body.appendChild(aiBtn);
+                }
+
+                createAIPanel() {
+                    const aiPanel = document.createElement('div');
+                    aiPanel.id = 'aiAssistantPanel';
+                    
+                    Object.assign(aiPanel.style, {
+                        position: 'fixed',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        width: '80%',
+                        maxWidth: '600px',
+                        backgroundColor: 'rgba(20, 20, 40, 0.98)',
+                        border: '2px solid #4169e1',
+                        borderRadius: '10px',
+                        padding: '20px',
+                        zIndex: '1001',
+                        display: 'none',
+                        color: '#e0e0ff',
+                        boxShadow: '0 0 30px rgba(65, 105, 225, 0.3)',
+                        backdropFilter: 'blur(10px)'
+                    });
+                    
+                    aiPanel.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <h2 style="margin: 0; color: #8a2be2; font-size: 20px;">🤖 智能助手</h2>
+                            <button id="closeAIPanel" style="
+                                background: rgba(65, 105, 225, 0.2);
+                                border: 1px solid #4169e1;
+                                color: #e0e0ff;
+                                padding: 8px 15px;
+                                border-radius: 5px;
+                                cursor: pointer;
+                                font-size: 12px;
+                                transition: all 0.3s;
+                            ">关闭</button>
+                        </div>
+                        
+                        <div id="suggestionsList" style="margin-bottom: 20px;">
+                            <h3 style="color: #4169e1; margin-bottom: 10px; font-size: 16px;">💡 智能建议</h3>
+                            <div id="suggestionsContainer" style="max-height: 300px; overflow-y: auto;"></div>
+                        </div>
+                        
+                        <div id="aiChatSection" style="margin-top: 20px;">
+                            <h3 style="color: #8a2be2; margin-bottom: 10px; font-size: 16px;">💬 智能问答</h3>
+                            <div style="margin-bottom: 10px;">
+                                <input type="text" id="aiQueryInput" placeholder="问我关于待办事项的问题..." style="
+                                    width: 100%;
+                                    padding: 10px;
+                                    background: rgba(30, 30, 60, 0.8);
+                                    border: 1px solid rgba(65, 105, 225, 0.3);
+                                    border-radius: 5px;
+                                    color: #e0e0ff;
+                                    margin-bottom: 10px;
+                                ">
+                                <button id="sendQueryBtn" style="
+                                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                    border: none;
+                                    color: white;
+                                    padding: 8px 20px;
+                                    border-radius: 5px;
+                                    cursor: pointer;
+                                    width: 100%;
+                                ">发送</button>
+                            </div>
+                            <div id="chatMessages" style="
+                                max-height: 200px;
+                                overflow-y: auto;
+                                padding: 10px;
+                                background: rgba(20, 20, 40, 0.8);
+                                border-radius: 5px;
+                                border: 1px solid rgba(65, 105, 225, 0.2);
+                            "></div>
+                        </div>
+                    `;
+
+                    document.body.appendChild(aiPanel);
+                    
+                    // 添加事件监听
+                    document.getElementById('closeAIPanel').addEventListener('click', () => {
+                        this.hideAIPanel();
+                    });
+                    
+                    document.getElementById('sendQueryBtn').addEventListener('click', () => {
+                        this.handleQuery();
+                    });
+                    
+                    document.getElementById('aiQueryInput').addEventListener('keypress', (e) => {
+                        if (e.key === 'Enter') {
+                            this.handleQuery();
+                        }
+                    });
+                    
+                    // 添加关闭面板的ESC键支持
+                    document.addEventListener('keydown', (e) => {
+                        if (e.key === 'Escape') {
+                            this.hideAIPanel();
+                        }
+                    });
+                    
+                    // 点击面板外部关闭
+                    aiPanel.addEventListener('click', (e) => {
+                        if (e.target === aiPanel) {
+                            this.hideAIPanel();
+                        }
+                    });
+                }
+
+                toggleAIPanel() {
+                    const panel = document.getElementById('aiAssistantPanel');
+                    if (panel.style.display === 'block') {
+                        this.hideAIPanel();
+                    } else {
+                        this.showAIPanel();
+                    }
+                }
+
+                showAIPanel() {
+                    const panel = document.getElementById('aiAssistantPanel');
+                    panel.style.display = 'block';
+                    this.updateSuggestions();
+                }
+
+                hideAIPanel() {
+                    const panel = document.getElementById('aiAssistantPanel');
+                    panel.style.display = 'none';
+                }
+
+                updateSuggestions() {
+                    const todos = JSON.parse(localStorage.getItem('todos')) || [];
+                    const suggestions = this.aiService.analyzeTodos(todos);
+                    const suggestionsContainer = document.getElementById('suggestionsContainer');
+                    
+                    suggestionsContainer.innerHTML = '';
+                    
+                    if (suggestions.length === 0) {
+                        suggestionsContainer.innerHTML = '<p style="color: #888; text-align: center; padding: 20px;">暂无建议，一切正常！</p>';
+                        return;
+                    }
+                    
+                    suggestions.forEach(suggestion => {
+                        const suggestionEl = document.createElement('div');
+                        Object.assign(suggestionEl.style, {
+                            background: 'rgba(65, 105, 225, 0.1)',
+                            borderRadius: '8px',
+                            padding: '10px',
+                            marginBottom: '10px',
+                            borderLeft: '3px solid #4169e1',
+                            transition: 'all 0.3s'
+                        });
+                        
+                        suggestionEl.innerHTML = `
+                            <strong style="color: #e0e0ff; font-size: 14px; display: block; margin-bottom: 5px;">${suggestion.title}</strong>
+                            <p style="margin: 5px 0 0 0; color: #aaa; font-size: 12px;">${suggestion.message}</p>
+                        `;
+                        
+                        suggestionEl.addEventListener('mouseenter', () => {
+                            suggestionEl.style.background = 'rgba(65, 105, 225, 0.2)';
+                        });
+                        
+                        suggestionEl.addEventListener('mouseleave', () => {
+                            suggestionEl.style.background = 'rgba(65, 105, 225, 0.1)';
+                        });
+                        
+                        suggestionsContainer.appendChild(suggestionEl);
+                    });
+                }
+
+                handleQuery() {
+                    const input = document.getElementById('aiQueryInput');
+                    const query = input.value.trim();
+                    const messages = document.getElementById('chatMessages');
+                    
+                    if (!query) return;
+                    
+                    // 添加用户消息
+                    this.addMessage('user', query);
+                    input.value = '';
+                    
+                    // 模拟AI思考
+                    setTimeout(() => {
+                        const todos = JSON.parse(localStorage.getItem('todos')) || [];
+                        const response = this.generateSmartResponse(query, todos);
+                        this.addMessage('ai', response);
+                    }, 500);
+                }
+                
+                generateSmartResponse(query, todos) {
+                    const lowercaseQuery = query.toLowerCase();
+                    const pendingTodos = todos.filter(todo => !todo.completed);
+                    
+                    if (lowercaseQuery.includes('今天') || lowercaseQuery.includes('今日')) {
+                        return this.getTodaySummary(pendingTodos);
+                    } else if (lowercaseQuery.includes('明天') || lowercaseQuery.includes('明日')) {
+                        return this.getTomorrowSummary(pendingTodos);
+                    } else if (lowercaseQuery.includes('紧急') || lowercaseQuery.includes('重要')) {
+                        return this.getUrgentTasks(pendingTodos);
+                    } else if (lowercaseQuery.includes('所有') || lowercaseQuery.includes('全部')) {
+                        return this.getAllTasksSummary(todos);
+                    } else {
+                        return this.getGeneralResponse(pendingTodos);
+                    }
+                }
+                
+                getTodaySummary(todos) {
+                    const now = new Date();
+                    const todayCount = todos.filter(todo => 
+                        this.isSameDay(new Date(todo.datetime), now)
+                    ).length;
+                    
+                    return `今天您有${todayCount}个待办事项需要处理`;
+                }
+                
+                getTomorrowSummary(todos) {
+                    const now = new Date();
+                    const tomorrow = new Date(now);
+                    tomorrow.setDate(tomorrow.getDate() + 1);
+                    
+                    const tomorrowCount = todos.filter(todo => 
+                        this.isSameDay(new Date(todo.datetime), tomorrow)
+                    ).length;
+                    
+                    return `明天您有${tomorrowCount}个待办事项需要准备`;
+                }
+                
+                getUrgentTasks(todos) {
+                    const now = new Date();
+                    const urgentCount = todos.filter(todo => {
+                        const timeDiff = new Date(todo.datetime) - now;
+                        return timeDiff < 24 * 60 * 60 * 1000;
+                    }).length;
+                    
+                    return `您有${urgentCount}个紧急任务需要在24小时内完成`;
+                }
+                
+                getAllTasksSummary(todos) {
+                    const total = todos.length;
+                    const completed = todos.filter(todo => todo.completed).length;
+                    const pending = total - completed;
+                    
+                    return `总计${total}个任务，已完成${completed}个，剩余${pending}个待办`;
+                }
+                
+                getGeneralResponse(todos) {
+                    const pending = todos.length;
+                    
+                    if (pending === 0) {
+                        return '🎉 恭喜！您目前没有待办事项，可以好好休息了！';
+                    } else if (pending <= 3) {
+                        return '👍 您的待办事项不多，继续保持！';
+                    } else if (pending <= 7) {
+                        return '💪 任务量适中，建议合理安排时间完成';
+                    } else {
+                        return '🚨 任务较多，建议优先处理重要紧急的事项';
+                    }
+                }
+                
+                isSameDay(date1, date2) {
+                    return date1.getFullYear() === date2.getFullYear() &&
+                           date1.getMonth() === date2.getMonth() &&
+                           date1.getDate() === date2.getDate();
+                }
+
+                addMessage(sender, text) {
+                    const messages = document.getElementById('chatMessages');
+                    const messageEl = document.createElement('div');
+                    Object.assign(messageEl.style, {
+                        marginBottom: '10px',
+                        padding: '8px 12px',
+                        borderRadius: '10px',
+                        maxWidth: '80%',
+                        wordWrap: 'break-word'
+                    });
+                    
+                    if (sender === 'user') {
+                        Object.assign(messageEl.style, {
+                            background: 'rgba(65, 105, 225, 0.3)',
+                            marginLeft: 'auto',
+                            marginRight: '0'
+                        });
+                    } else {
+                        Object.assign(messageEl.style, {
+                            background: 'rgba(138, 43, 226, 0.3)',
+                            marginLeft: '0',
+                            marginRight: 'auto'
+                        });
+                    }
+                    
+                    messageEl.innerHTML = text;
+                    messages.appendChild(messageEl);
+                    messages.scrollTop = messages.scrollHeight;
+                }
+            }
+
+            // 在现有代码中添加AI助手初始化
+            setTimeout(() => {
+                new AIAssistant();
+            }, 1000);
         });
     </script>
 </body>
