@@ -1724,14 +1724,31 @@
             showCategory('all');
             
             // ============================================
-            // 修复版智能体 - 解决竖版显示问题
+            // 修复版智能体 - 解决多设备配置同步问题
             // ============================================
+            
+            // 生成设备唯一ID
+            const getDeviceId = () => {
+                let deviceId = localStorage.getItem('device_id');
+                if (!deviceId) {
+                    // 生成基于浏览器指纹和设备信息的唯一ID
+                    deviceId = 'device_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                    localStorage.setItem('device_id', deviceId);
+                }
+                return deviceId;
+            };
+            
+            // 设备特定存储键名
+            const DEVICE_ID = getDeviceId();
+            const API_KEY_KEY = `deepseek_api_key_${DEVICE_ID}`;
+            const API_MODEL_KEY = `deepseek_model_${DEVICE_ID}`;
+            const API_CONFIG_KEY = `api_config_status_${DEVICE_ID}`;
             
             // DeepSeek API 配置
             const DEEPSEEK_CONFIG = {
-                apiKey: localStorage.getItem('deepseek_api_key') || '',
+                apiKey: localStorage.getItem(API_KEY_KEY) || '',
                 baseUrl: 'https://api.deepseek.com/v1',
-                model: 'deepseek-chat',
+                model: localStorage.getItem(API_MODEL_KEY) || 'deepseek-chat',
                 temperature: 0.7,
                 maxTokens: 2000
             };
@@ -1739,16 +1756,64 @@
             // 智能体核心类
             class AISmartAgent {
                 constructor() {
+                    this.deviceId = DEVICE_ID;
                     this.isConnected = false;
+                    this.isConfigured = false; // 明确标记是否已配置
                     this.messageCount = 0;
                     this.init();
                 }
 
                 async init() {
+                    console.log(`设备ID: ${this.deviceId}`);
+                    console.log(`API Key: ${DEEPSEEK_CONFIG.apiKey ? '已设置' : '未设置'}`);
+                    
                     this.createFloatingButton();
                     this.createChatPanel();
                     this.bindEvents();
-                    this.testAPIConnection();
+                    
+                    // 检查配置状态
+                    this.checkConfigStatus();
+                    
+                    // 测试连接
+                    if (DEEPSEEK_CONFIG.apiKey) {
+                        await this.testAPIConnection();
+                    }
+                }
+
+                // 检查配置状态
+                checkConfigStatus() {
+                    const configStatus = localStorage.getItem(API_CONFIG_KEY);
+                    this.isConfigured = configStatus === 'configured';
+                    
+                    if (DEEPSEEK_CONFIG.apiKey && !this.isConfigured) {
+                        // 有API Key但未标记为已配置，可能来自其他设备
+                        console.log('检测到API Key但未标记为已配置，清理配置...');
+                        this.clearDeviceConfig();
+                        this.updateAPIStatus(false, '检测到跨设备配置，已重置');
+                    } else if (this.isConfigured && !DEEPSEEK_CONFIG.apiKey) {
+                        // 标记为已配置但没有API Key，逻辑错误
+                        console.log('配置状态不一致，重置...');
+                        this.clearDeviceConfig();
+                        this.updateAPIStatus(false, '配置状态错误，已重置');
+                    } else if (this.isConfigured && DEEPSEEK_CONFIG.apiKey) {
+                        // 正常状态
+                        this.updateAPIStatus(true, '已配置');
+                    } else {
+                        // 未配置状态
+                        this.updateAPIStatus(false, '未配置');
+                    }
+                }
+
+                // 清理设备配置
+                clearDeviceConfig() {
+                    localStorage.removeItem(API_KEY_KEY);
+                    localStorage.removeItem(API_MODEL_KEY);
+                    localStorage.removeItem(API_CONFIG_KEY);
+                    
+                    DEEPSEEK_CONFIG.apiKey = '';
+                    DEEPSEEK_CONFIG.model = 'deepseek-chat';
+                    this.isConfigured = false;
+                    this.isConnected = false;
                 }
 
                 // 创建悬浮按钮
@@ -1759,27 +1824,31 @@
                     
                     const btn = document.createElement('div');
                     btn.id = 'aiFloatBtn';
+                    btn.title = '星云智能助手';
                     
                     btn.innerHTML = `
                         <div class="ai-avatar">🤖</div>
-                        <div class="ai-badge" id="aiBadge">AI</div>
+                        <div class="ai-badge" id="aiBadge">${this.isConfigured ? '✓' : 'AI'}</div>
                     `;
                     
-                    // 按钮样式 - 确保在最上层
                     Object.assign(btn.style, {
                         position: 'fixed',
                         bottom: '30px',
                         right: '30px',
                         width: '60px',
                         height: '60px',
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        background: this.isConfigured ? 
+                            'linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)' : 
+                            'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                         borderRadius: '50%',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         cursor: 'pointer',
-                        zIndex: '9999', // 确保在最上层
-                        boxShadow: '0 4px 20px rgba(102, 126, 234, 0.5)',
+                        zIndex: '9999',
+                        boxShadow: this.isConfigured ? 
+                            '0 4px 20px rgba(76, 175, 80, 0.5)' : 
+                            '0 4px 20px rgba(102, 126, 234, 0.5)',
                         transition: 'all 0.3s ease',
                         border: '3px solid rgba(255, 255, 255, 0.2)'
                     });
@@ -1795,7 +1864,7 @@
                         position: absolute;
                         top: -5px;
                         right: -5px;
-                        background: #ff4757;
+                        background: ${this.isConfigured ? '#4CAF50' : '#ff4757'};
                         color: white;
                         font-size: 10px;
                         padding: 2px 5px;
@@ -1806,12 +1875,16 @@
                     // 悬停效果
                     btn.onmouseenter = () => {
                         btn.style.transform = 'scale(1.1)';
-                        btn.style.boxShadow = '0 6px 25px rgba(102, 126, 234, 0.7)';
+                        btn.style.boxShadow = this.isConfigured ? 
+                            '0 6px 25px rgba(76, 175, 80, 0.7)' : 
+                            '0 6px 25px rgba(102, 126, 234, 0.7)';
                     };
                     
                     btn.onmouseleave = () => {
                         btn.style.transform = 'scale(1)';
-                        btn.style.boxShadow = '0 4px 20px rgba(102, 126, 234, 0.5)';
+                        btn.style.boxShadow = this.isConfigured ? 
+                            '0 4px 20px rgba(76, 175, 80, 0.5)' : 
+                            '0 4px 20px rgba(102, 126, 234, 0.5)';
                     };
                     
                     document.body.appendChild(btn);
@@ -1820,7 +1893,7 @@
                     btn.onclick = () => this.toggleChatPanel();
                 }
 
-                // 创建聊天面板 - 修复竖版问题
+                // 创建聊天面板
                 createChatPanel() {
                     // 移除旧面板
                     const oldPanel = document.getElementById('aiChatPanel');
@@ -1829,31 +1902,36 @@
                     const panel = document.createElement('div');
                     panel.id = 'aiChatPanel';
                     
-                    // 关键修复：使用内联样式确保不被外部CSS影响
                     Object.assign(panel.style, {
                         position: 'fixed',
                         bottom: '100px',
                         right: '30px',
-                        width: '350px',  // 固定宽度
-                        height: '500px', // 固定高度
+                        width: '400px',
+                        height: '550px',
                         background: 'rgba(20, 20, 40, 0.98)',
                         borderRadius: '15px',
-                        border: '2px solid #4169e1',
+                        border: this.isConfigured ? 
+                            '2px solid #4CAF50' : '2px solid #4169e1',
                         zIndex: '9998',
-                        display: 'none',  // 初始隐藏
+                        display: 'none',
                         flexDirection: 'column',
                         backdropFilter: 'blur(10px)',
                         boxShadow: '0 10px 40px rgba(0, 0, 0, 0.5)',
                         overflow: 'hidden',
-                        boxSizing: 'border-box' // 重要：包含padding和border
+                        boxSizing: 'border-box'
                     });
+                    
+                    const statusColor = this.isConfigured ? '#4CAF50' : '#ff4757';
+                    const statusText = this.isConfigured ? '已配置' : '未配置';
                     
                     panel.innerHTML = `
                         <!-- 头部 -->
                         <div class="ai-header" style="
                             padding: 15px;
-                            background: linear-gradient(135deg, rgba(65, 105, 225, 0.3) 0%, rgba(138, 43, 226, 0.3) 100%);
-                            border-bottom: 1px solid rgba(65, 105, 225, 0.5);
+                            background: ${this.isConfigured ? 
+                                'linear-gradient(135deg, rgba(76, 175, 80, 0.3) 0%, rgba(46, 125, 50, 0.3) 100%)' : 
+                                'linear-gradient(135deg, rgba(65, 105, 225, 0.3) 0%, rgba(138, 43, 226, 0.3) 100%)'};
+                            border-bottom: 1px solid ${this.isConfigured ? 'rgba(76, 175, 80, 0.5)' : 'rgba(65, 105, 225, 0.5)'};
                             display: flex;
                             justify-content: space-between;
                             align-items: center;
@@ -1863,7 +1941,9 @@
                                 <div style="
                                     width: 36px;
                                     height: 36px;
-                                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                    background: ${this.isConfigured ? 
+                                        'linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)' : 
+                                        'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'};
                                     border-radius: 50%;
                                     display: flex;
                                     align-items: center;
@@ -1873,22 +1953,25 @@
                                 ">🤖</div>
                                 <div>
                                     <h3 style="margin: 0; color: white; font-size: 16px; line-height: 1.2;">星云智能助手</h3>
-                                    <div id="apiStatus" style="font-size: 10px; color: #aaa; line-height: 1.2;">
-                                        <span id="statusDot" style="color: #ff4757;">●</span> 正在连接...
+                                    <div id="apiStatus" style="font-size: 10px; color: ${statusColor}; line-height: 1.2;">
+                                        <span id="statusDot" style="color: ${statusColor};">●</span> ${statusText}
+                                        <span id="deviceInfo" style="color: #666; font-size: 8px; margin-left: 5px;">
+                                            设备: ${this.deviceId.substr(0, 8)}...
+                                        </span>
                                     </div>
                                 </div>
                             </div>
                             <div style="display: flex; gap: 8px;">
                                 <button id="aiConfigBtn" style="
                                     background: transparent;
-                                    border: 1px solid #4169e1;
-                                    color: #4169e1;
+                                    border: 1px solid ${this.isConfigured ? '#4CAF50' : '#4169e1'};
+                                    color: ${this.isConfigured ? '#4CAF50' : '#4169e1'};
                                     padding: 4px 10px;
                                     border-radius: 4px;
                                     font-size: 10px;
                                     cursor: pointer;
                                     white-space: nowrap;
-                                ">配置</button>
+                                ">${this.isConfigured ? '重新配置' : '配置API'}</button>
                                 <button id="aiCloseBtn" style="
                                     background: transparent;
                                     border: none;
@@ -1910,51 +1993,91 @@
                             flex-direction: column;
                             gap: 10px;
                             box-sizing: border-box;
-                        "></div>
+                        ">
+                            <div class="welcome-message" style="
+                                padding: 15px;
+                                background: rgba(65, 105, 225, 0.1);
+                                border-radius: 10px;
+                                border-left: 3px solid #4169e1;
+                                color: #e0e0ff;
+                                font-size: 13px;
+                                line-height: 1.5;
+                            ">
+                                <strong>🌟 欢迎使用星云智能助手！</strong><br><br>
+                                ${this.isConfigured ? 
+                                    '✅ API已配置，可以开始对话！' : 
+                                    '⚙️ 请先配置DeepSeek API以使用完整功能。<br>点击"配置API"按钮开始设置。'
+                                }
+                            </div>
+                        </div>
                         
                         <!-- 输入区域 -->
                         <div class="ai-input" style="
                             padding: 15px;
-                            border-top: 1px solid rgba(65, 105, 225, 0.3);
+                            border-top: 1px solid ${this.isConfigured ? 'rgba(76, 175, 80, 0.3)' : 'rgba(65, 105, 225, 0.3)'};
                             background: rgba(15, 15, 30, 0.8);
                             box-sizing: border-box;
                         ">
                             <div style="display: flex; gap: 10px; align-items: center;">
-                                <input type="text" id="aiInput" placeholder="输入消息..." style="
+                                <input type="text" id="aiInput" 
+                                       placeholder="${this.isConfigured ? '输入消息...' : '请先配置API...'}"
+                                       ${this.isConfigured ? '' : 'disabled'}
+                                       style="
                                     flex: 1;
                                     padding: 10px 15px;
-                                    background: rgba(30, 30, 60, 0.8);
-                                    border: 1px solid rgba(65, 105, 225, 0.3);
+                                    background: ${this.isConfigured ? 
+                                        'rgba(30, 30, 60, 0.8)' : 
+                                        'rgba(60, 60, 60, 0.5)'};
+                                    border: 1px solid ${this.isConfigured ? 
+                                        'rgba(65, 105, 225, 0.3)' : 
+                                        'rgba(100, 100, 100, 0.3)'};
                                     border-radius: 20px;
-                                    color: white;
+                                    color: ${this.isConfigured ? 'white' : '#888'};
                                     font-size: 13px;
                                     outline: none;
-                                    min-width: 0; /* 防止输入框溢出 */
+                                    min-width: 0;
+                                    cursor: ${this.isConfigured ? 'text' : 'not-allowed'};
                                 ">
-                                <button id="aiSendBtn" style="
+                                <button id="aiSendBtn" 
+                                        ${this.isConfigured ? '' : 'disabled'}
+                                        style="
                                     width: 40px;
                                     height: 40px;
                                     border-radius: 50%;
-                                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                    background: ${this.isConfigured ? 
+                                        'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 
+                                        'rgba(100, 100, 100, 0.5)'};
                                     border: none;
-                                    color: white;
-                                    cursor: pointer;
+                                    color: ${this.isConfigured ? 'white' : '#666'};
+                                    cursor: ${this.isConfigured ? 'pointer' : 'not-allowed'};
                                     display: flex;
                                     align-items: center;
                                     justify-content: center;
                                     font-size: 18px;
-                                    flex-shrink: 0; /* 防止按钮被压缩 */
+                                    flex-shrink: 0;
                                 ">→</button>
                             </div>
+                            ${!this.isConfigured ? `
+                                <div style="
+                                    text-align: center;
+                                    margin-top: 10px;
+                                    font-size: 11px;
+                                    color: #ff4757;
+                                ">
+                                    ⚠️ 请先配置API才能使用
+                                </div>
+                            ` : ''}
                         </div>
                     `;
                     
                     document.body.appendChild(panel);
                     
-                    // 添加欢迎消息
-                    setTimeout(() => {
-                        this.addMessage('ai', '你好！我是星云智能助手，已成功连接DeepSeek API。\n\n我可以帮你：\n📅 管理待办事项\n⏰ 提醒重要任务\n💡 提供时间管理建议\n🤔 回答任何问题\n\n请问有什么可以帮您？');
-                    }, 1000);
+                    // 如果已配置，添加欢迎消息
+                    if (this.isConfigured) {
+                        setTimeout(() => {
+                            this.addMessage('ai', '✅ 星云智能助手已就绪！\n\n我可以帮你：\n📅 管理待办事项\n⏰ 提醒重要任务\n💡 提供智能建议\n🤔 回答任何问题\n\n请问有什么可以帮您？');
+                        }, 500);
+                    }
                 }
 
                 bindEvents() {
@@ -1966,7 +2089,7 @@
                     sendBtn.onclick = () => this.sendMessage();
                     
                     input.onkeydown = (e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
+                        if (e.key === 'Enter' && !e.shiftKey && this.isConfigured) {
                             e.preventDefault();
                             this.sendMessage();
                         }
@@ -1974,7 +2097,7 @@
                     
                     closeBtn.onclick = () => this.toggleChatPanel();
                     
-                    configBtn.onclick = () => this.showConfig();
+                    configBtn.onclick = () => this.showConfigPanel();
                 }
 
                 toggleChatPanel() {
@@ -1983,20 +2106,25 @@
                     
                     if (panel.style.display === 'flex') {
                         panel.style.display = 'none';
-                        btn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
                     } else {
                         panel.style.display = 'flex';
-                        btn.style.background = 'linear-gradient(135deg, #764ba2 0%, #667eea 100%)';
                         
                         // 聚焦输入框
                         setTimeout(() => {
                             const input = document.getElementById('aiInput');
-                            input?.focus();
+                            if (this.isConfigured) {
+                                input?.focus();
+                            }
                         }, 100);
                     }
                 }
 
                 async sendMessage() {
+                    if (!this.isConfigured) {
+                        this.showConfigPanel();
+                        return;
+                    }
+                    
                     const input = document.getElementById('aiInput');
                     const message = input.value.trim();
                     
@@ -2014,13 +2142,13 @@
                         this.updateMessage(thinkingId, 'ai', response);
                     } catch (error) {
                         console.error('发送消息失败:', error);
-                        this.updateMessage(thinkingId, 'ai', '抱歉，处理消息时出现了问题。请重试。');
+                        this.updateMessage(thinkingId, 'ai', '抱歉，处理消息时出现了问题。请检查API配置。');
                     }
                 }
 
                 async getAIResponse(message) {
                     if (!DEEPSEEK_CONFIG.apiKey) {
-                        return '请先配置DeepSeek API Key。';
+                        throw new Error('API Key未配置');
                     }
                     
                     const todos = JSON.parse(localStorage.getItem('todos')) || [];
@@ -2066,6 +2194,7 @@
                     
                     const messageDiv = document.createElement('div');
                     messageDiv.id = messageId;
+                    messageDiv.className = `message ${role}`;
                     
                     Object.assign(messageDiv.style, {
                         maxWidth: '85%',
@@ -2096,6 +2225,7 @@
                     
                     const messageDiv = document.createElement('div');
                     messageDiv.id = messageId;
+                    messageDiv.className = 'message ai thinking';
                     
                     Object.assign(messageDiv.style, {
                         alignSelf: 'flex-start',
@@ -2131,7 +2261,8 @@
 
                 async testAPIConnection() {
                     if (!DEEPSEEK_CONFIG.apiKey) {
-                        this.updateAPIStatus(false, '未配置API');
+                        this.isConnected = false;
+                        this.updateAPIStatus(false, '未配置');
                         return;
                     }
                     
@@ -2145,12 +2276,18 @@
                         
                         if (response.ok) {
                             this.isConnected = true;
-                            this.updateAPIStatus(true, 'API已连接');
+                            this.updateAPIStatus(true, '已连接');
+                            
+                            // 更新UI
+                            setTimeout(() => {
+                                this.addMessage('ai', '✅ DeepSeek API连接成功！可以开始对话。');
+                            }, 1000);
                         } else {
                             throw new Error(`HTTP ${response.status}`);
                         }
                     } catch (error) {
                         console.error('API连接测试失败:', error);
+                        this.isConnected = false;
                         this.updateAPIStatus(false, '连接失败');
                     }
                 }
@@ -2162,28 +2299,264 @@
                     if (statusDot && statusText) {
                         if (isConnected) {
                             statusDot.style.color = '#4CAF50';
-                            statusText.innerHTML = `<span id="statusDot" style="color: #4CAF50;">●</span> ${message || 'DeepSeek API 已连接'}`;
+                            statusText.innerHTML = `<span id="statusDot" style="color: #4CAF50;">●</span> ${message || '已连接'}`;
                         } else {
                             statusDot.style.color = '#ff4757';
-                            statusText.innerHTML = `<span id="statusDot" style="color: #ff4757;">●</span> ${message || '本地模式'}`;
+                            statusText.innerHTML = `<span id="statusDot" style="color: #ff4757;">●</span> ${message || '未连接'}`;
                         }
                     }
                 }
 
-                showConfig() {
-                    // 配置面板代码...
-                    alert('配置功能已就绪，可以在聊天框直接提问测试API是否工作！');
+                showConfigPanel() {
+                    const configHTML = `
+                        <div id="aiConfigPanel" style="
+                            position: fixed;
+                            top: 50%;
+                            left: 50%;
+                            transform: translate(-50%, -50%);
+                            width: 450px;
+                            max-width: 90%;
+                            background: rgba(20, 20, 40, 0.98);
+                            border: 2px solid #8a2be2;
+                            border-radius: 15px;
+                            padding: 25px;
+                            z-index: 10000;
+                            backdrop-filter: blur(10px);
+                            box-shadow: 0 0 40px rgba(138, 43, 226, 0.4);
+                            color: white;
+                        ">
+                            <h3 style="margin: 0 0 20px 0; color: #8a2be2; text-align: center; font-size: 18px;">
+                                ⚙️ DeepSeek API 配置
+                            </h3>
+                            
+                            <div style="font-size: 12px; color: #888; margin-bottom: 15px; text-align: center;">
+                                设备ID: ${this.deviceId}
+                            </div>
+                            
+                            <div style="margin-bottom: 20px;">
+                                <label style="display: block; margin-bottom: 8px; color: #aaa; font-size: 14px;">
+                                    API Key
+                                </label>
+                                <input type="password" id="apiKeyInput" 
+                                       value="${DEEPSEEK_CONFIG.apiKey || ''}"
+                                       placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                                       style="width: 100%; padding: 12px; background: rgba(30, 30, 60, 0.8); 
+                                              border: 1px solid #8a2be2; border-radius: 8px; 
+                                              color: white; font-size: 14px; font-family: monospace;">
+                                <div style="font-size: 12px; color: #888; margin-top: 8px;">
+                                    🔑 获取API Key: 
+                                    <a href="https://platform.deepseek.com/api_keys" target="_blank" 
+                                       style="color: #4CAF50; text-decoration: none;">
+                                        https://platform.deepseek.com/api_keys
+                                    </a>
+                                </div>
+                            </div>
+                            
+                            <div style="margin-bottom: 20px;">
+                                <label style="display: block; margin-bottom: 8px; color: #aaa; font-size: 14px;">
+                                    模型选择
+                                </label>
+                                <select id="modelSelect" style="width: 100%; padding: 12px; background: rgba(30, 30, 60, 0.8); 
+                                        border: 1px solid #8a2be2; border-radius: 8px; color: white; font-size: 14px;">
+                                    <option value="deepseek-chat" ${DEEPSEEK_CONFIG.model === 'deepseek-chat' ? 'selected' : ''}>
+                                        deepseek-chat (推荐)
+                                    </option>
+                                    <option value="deepseek-coder" ${DEEPSEEK_CONFIG.model === 'deepseek-coder' ? 'selected' : ''}>
+                                        deepseek-coder
+                                    </option>
+                                </select>
+                            </div>
+                            
+                            <div id="testResult" style="
+                                margin-bottom: 20px; 
+                                padding: 10px; 
+                                border-radius: 8px; 
+                                display: none;
+                                text-align: center;
+                                font-size: 13px;
+                            "></div>
+                            
+                            <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                                <button id="clearConfigBtn" style="
+                                    padding: 10px 20px; 
+                                    background: rgba(244, 67, 54, 0.2); 
+                                    border: 1px solid #F44336; 
+                                    color: #F44336; 
+                                    border-radius: 8px; 
+                                    cursor: pointer;
+                                    font-size: 13px;
+                                ">
+                                    清除配置
+                                </button>
+                                <button id="testBtn" style="
+                                    padding: 10px 20px; 
+                                    background: rgba(33, 150, 243, 0.2); 
+                                    border: 1px solid #2196F3; 
+                                    color: #2196F3; 
+                                    border-radius: 8px; 
+                                    cursor: pointer;
+                                    font-size: 13px;
+                                ">
+                                    测试连接
+                                </button>
+                                <button id="saveConfigBtn" style="
+                                    padding: 10px 20px; 
+                                    background: linear-gradient(135deg, #8a2be2 0%, #4169e1 100%); 
+                                    border: none; 
+                                    color: white; 
+                                    border-radius: 8px; 
+                                    cursor: pointer; 
+                                    font-weight: bold;
+                                    font-size: 13px;
+                                ">
+                                    保存配置
+                                </button>
+                            </div>
+                            
+                            <div style="
+                                margin-top: 20px; 
+                                padding: 10px; 
+                                background: rgba(0, 0, 0, 0.3); 
+                                border-radius: 8px; 
+                                font-size: 11px; 
+                                color: #888;
+                                text-align: center;
+                            ">
+                                💡 提示：配置信息仅保存在当前设备
+                            </div>
+                        </div>
+                    `;
+                    
+                    // 移除旧面板
+                    const oldPanel = document.getElementById('aiConfigPanel');
+                    if (oldPanel) oldPanel.remove();
+                    
+                    // 添加新面板
+                    const configContainer = document.createElement('div');
+                    configContainer.innerHTML = configHTML;
+                    document.body.appendChild(configContainer.firstElementChild);
+                    
+                    // 绑定事件
+                    this.bindConfigEvents();
+                }
+
+                bindConfigEvents() {
+                    const testBtn = document.getElementById('testBtn');
+                    const saveBtn = document.getElementById('saveConfigBtn');
+                    const clearBtn = document.getElementById('clearConfigBtn');
+                    const configPanel = document.getElementById('aiConfigPanel');
+                    
+                    testBtn.onclick = async () => {
+                        const apiKey = document.getElementById('apiKeyInput').value.trim();
+                        if (!apiKey) {
+                            this.showTestResult('请输入API Key', false);
+                            return;
+                        }
+                        
+                        this.showTestResult('正在测试连接...', 'loading');
+                        
+                        try {
+                            const response = await fetch(`${DEEPSEEK_CONFIG.baseUrl}/models`, {
+                                headers: { 
+                                    'Authorization': `Bearer ${apiKey}`,
+                                    'Content-Type': 'application/json'
+                                }
+                            });
+                            
+                            if (response.ok) {
+                                this.showTestResult('✅ 连接成功！API Key有效。', true);
+                            } else {
+                                this.showTestResult(`❌ 连接失败: HTTP ${response.status}`, false);
+                            }
+                        } catch (error) {
+                            this.showTestResult(`❌ 网络错误: ${error.message}`, false);
+                        }
+                    };
+                    
+                    saveBtn.onclick = () => {
+                        const apiKey = document.getElementById('apiKeyInput').value.trim();
+                        const model = document.getElementById('modelSelect').value;
+                        
+                        if (!apiKey) {
+                            this.showTestResult('请输入API Key', false);
+                            return;
+                        }
+                        
+                        // 保存配置
+                        localStorage.setItem(API_KEY_KEY, apiKey);
+                        localStorage.setItem(API_MODEL_KEY, model);
+                        localStorage.setItem(API_CONFIG_KEY, 'configured');
+                        
+                        DEEPSEEK_CONFIG.apiKey = apiKey;
+                        DEEPSEEK_CONFIG.model = model;
+                        this.isConfigured = true;
+                        
+                        this.showTestResult('✅ 配置保存成功！重新加载界面...', true);
+                        
+                        setTimeout(() => {
+                            configPanel.remove();
+                            location.reload();
+                        }, 1500);
+                    };
+                    
+                    clearBtn.onclick = () => {
+                        if (confirm('确定要清除当前设备的API配置吗？')) {
+                            this.clearDeviceConfig();
+                            this.showTestResult('✅ 配置已清除，重新加载界面...', true);
+                            
+                            setTimeout(() => {
+                                configPanel.remove();
+                                location.reload();
+                            }, 1000);
+                        }
+                    };
+                    
+                    // 点击外部关闭
+                    configPanel.onclick = (e) => {
+                        if (e.target === configPanel) {
+                            configPanel.remove();
+                        }
+                    };
+                    
+                    // ESC键关闭
+                    document.addEventListener('keydown', (e) => {
+                        if (e.key === 'Escape' && configPanel.style.display !== 'none') {
+                            configPanel.remove();
+                        }
+                    });
+                }
+
+                showTestResult(message, isSuccess) {
+                    const resultDiv = document.getElementById('testResult');
+                    if (!resultDiv) return;
+                    
+                    resultDiv.style.display = 'block';
+                    resultDiv.textContent = message;
+                    
+                    if (isSuccess === 'loading') {
+                        resultDiv.style.background = 'rgba(255, 193, 7, 0.2)';
+                        resultDiv.style.color = '#FFC107';
+                        resultDiv.style.border = '1px solid #FFC107';
+                    } else if (isSuccess) {
+                        resultDiv.style.background = 'rgba(76, 175, 80, 0.2)';
+                        resultDiv.style.color = '#4CAF50';
+                        resultDiv.style.border = '1px solid #4CAF50';
+                    } else {
+                        resultDiv.style.background = 'rgba(244, 67, 54, 0.2)';
+                        resultDiv.style.color = '#F44336';
+                        resultDiv.style.border = '1px solid #F44336';
+                    }
                 }
             }
 
             // 初始化智能助手
             let aiAssistant = null;
             
-            // 等待页面完全加载
+            // 页面加载完成后初始化
             window.addEventListener('load', () => {
                 setTimeout(() => {
                     aiAssistant = new AISmartAgent();
-                    console.log('🤖 星云智能助手已启动');
+                    console.log(`🤖 星云智能助手已启动 (设备: ${DEVICE_ID})`);
                 }, 1000);
             });
 
