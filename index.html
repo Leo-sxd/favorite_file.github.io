@@ -1707,537 +1707,370 @@
 // 初始化显示所有分类
             showCategory('all');
             
-            // 配置DeepSeek API
-            const DEEPSEEK_CONFIG = {
-                apiKey: '', // 这里填入你的DeepSeek API Key
-                baseUrl: 'https://api.deepseek.com',
-                model: 'deepseek-chat',
+            // **********************
+            // DeepSeek API 集成部分
+            // **********************
+            
+            // DeepSeek API 配置
+            const DEEPSEEK_API_CONFIG = {
+                apiKey: localStorage.getItem('deepseek_api_key') || '',
+                baseURL: 'https://api.deepseek.com/v1',
+                model: localStorage.getItem('deepseek_model') || 'deepseek-chat',
                 temperature: 0.7,
-                maxTokens: 1000
+                maxTokens: 2000
             };
 
-            // AI服务类
-            class AIService {
+            // AI 服务类
+            class DeepSeekAIService {
                 constructor() {
-                    this.suggestions = [];
+                    this.apiKey = DEEPSEEK_API_CONFIG.apiKey;
+                    this.isConnected = !!this.apiKey;
                 }
 
-                // 分析待办事项并提供智能建议
-                async analyzeTodos(todos) {
-                    this.suggestions = [];
-                    
-                    const now = new Date();
-                    const pendingTodos = todos.filter(todo => !todo.completed);
-                    
-                    if (pendingTodos.length === 0) {
-                        this.suggestions.push({
-                            type: 'encouragement',
-                            title: '🎉 恭喜！',
-                            message: '您目前没有待办事项，继续保持高效！',
-                            confidence: 0.9
-                        });
-                        return this.suggestions;
-                    }
-
-                    // 时间管理分析
-                    this.analyzeTimeManagement(pendingTodos, now);
-                    
-                    // 任务分类分析
-                    this.analyzeCategorization(pendingTodos);
-                    
-                    // 优先级分析
-                    this.analyzePriority(pendingTodos, now);
-                    
-                    // 如果启用了DeepSeek API，获取AI增强建议
-                    if (DEEPSEEK_CONFIG.apiKey) {
-                        await this.getAIEnhancedSuggestions(todos);
-                    }
-                    
-                    return this.suggestions.sort((a, b) => b.confidence - a.confidence);
+                // 设置API Key
+                setApiKey(apiKey) {
+                    this.apiKey = apiKey;
+                    DEEPSEEK_API_CONFIG.apiKey = apiKey;
+                    this.isConnected = !!apiKey;
+                    localStorage.setItem('deepseek_api_key', apiKey);
                 }
 
-                // 调用DeepSeek API获取增强建议
-                async getAIEnhancedSuggestions(todos) {
+                // 测试API连接
+                async testConnection() {
+                    if (!this.apiKey) {
+                        return { success: false, message: 'API Key未设置' };
+                    }
+
                     try {
-                        const systemPrompt = `你是一个专业的任务管理助手。请分析以下待办事项并提供智能建议：
+                        const response = await fetch(`${DEEPSEEK_API_CONFIG.baseURL}/models`, {
+                            method: 'GET',
+                            headers: {
+                                'Authorization': `Bearer ${this.apiKey}`,
+                                'Content-Type': 'application/json'
+                            }
+                        });
 
-待办事项列表:
-${JSON.stringify(todos, null, 2)}
-
-请提供：
-1. 时间管理建议（哪些任务需要优先处理）
-2. 任务分类建议
-3. 工作效率提升建议
-4. 任何其他有价值的观察
-
-请用中文回复，格式为简短的建议点。`;
-
-                        const aiResponse = await this.callDeepSeekAPI([
-                            { role: 'system', content: '你是一个专业的时间管理和生产力助手。' },
-                            { role: 'user', content: systemPrompt }
-                        ]);
-
-                        if (aiResponse) {
-                            this.suggestions.push({
-                                type: 'ai_enhanced',
-                                title: '🤖 AI深度分析',
-                                message: aiResponse,
-                                confidence: 0.95
-                            });
+                        if (response.ok) {
+                            return { 
+                                success: true, 
+                                message: '✅ API连接成功！' 
+                            };
+                        } else {
+                            return { 
+                                success: false, 
+                                message: `❌ API连接失败: ${response.status} ${response.statusText}` 
+                            };
                         }
                     } catch (error) {
-                        console.error('DeepSeek API调用失败:', error);
+                        return { 
+                            success: false, 
+                            message: `❌ 网络错误: ${error.message}` 
+                        };
                     }
                 }
 
-                // 调用DeepSeek API
-                async callDeepSeekAPI(messages) {
-                    if (!DEEPSEEK_CONFIG.apiKey) {
-                        console.warn('DeepSeek API Key未配置');
-                        return null;
+                // 调用DeepSeek API生成回答
+                async generateResponse(prompt, context = '') {
+                    if (!this.apiKey) {
+                        return { 
+                            success: false, 
+                            response: '请先设置DeepSeek API Key。点击"配置API"按钮进行设置。' 
+                        };
                     }
 
+                    const systemPrompt = `你是一个智能任务管理助手，专门帮助用户管理待办事项和提高工作效率。
+
+任务管理原则：
+1. 优先处理紧急且重要的任务
+2. 合理安排时间，避免任务堆积
+3. 建议将大任务分解为小任务
+4. 提醒用户注意截止时间
+
+${context ? `用户的任务上下文：\n${context}\n\n` : ''}
+请用专业、有帮助的中文回答用户的问题，如果涉及具体任务，请提供具体可行的建议。`;
+
                     try {
-                        const response = await fetch(`${DEEPSEEK_CONFIG.baseUrl}/chat/completions`, {
+                        const response = await fetch(`${DEEPSEEK_API_CONFIG.baseURL}/chat/completions`, {
                             method: 'POST',
                             headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${DEEPSEEK_CONFIG.apiKey}`
+                                'Authorization': `Bearer ${this.apiKey}`,
+                                'Content-Type': 'application/json'
                             },
                             body: JSON.stringify({
-                                model: DEEPSEEK_CONFIG.model,
-                                messages: messages,
-                                temperature: DEEPSEEK_CONFIG.temperature,
-                                max_tokens: DEEPSEEK_CONFIG.maxTokens
+                                model: DEEPSEEK_API_CONFIG.model,
+                                messages: [
+                                    { role: 'system', content: systemPrompt },
+                                    { role: 'user', content: prompt }
+                                ],
+                                temperature: DEEPSEEK_API_CONFIG.temperature,
+                                max_tokens: DEEPSEEK_API_CONFIG.maxTokens,
+                                stream: false
                             })
                         });
 
                         if (!response.ok) {
-                            throw new Error(`API请求失败: ${response.status}`);
+                            const errorText = await response.text();
+                            throw new Error(`API错误 ${response.status}: ${errorText}`);
                         }
 
                         const data = await response.json();
-                        return data.choices[0]?.message?.content || null;
+                        return { 
+                            success: true, 
+                            response: data.choices[0]?.message?.content || '抱歉，没有收到有效的回复。'
+                        };
                     } catch (error) {
-                        console.error('调用DeepSeek API时出错:', error);
-                        return null;
+                        console.error('DeepSeek API调用失败:', error);
+                        return { 
+                            success: false, 
+                            response: `抱歉，AI服务暂时不可用: ${error.message}`
+                        };
                     }
                 }
 
-                analyzeTimeManagement(todos, now) {
-                    let urgentCount = 0;
-                    let todayCount = 0;
+                // 智能分析待办事项
+                async analyzeTodos(todos) {
+                    if (!this.apiKey) {
+                        return this.getLocalSuggestions(todos);
+                    }
+
+                    const todoSummary = todos.map(todo => 
+                        `- ${todo.completed ? '✅' : '⬜'} ${todo.text} (截止: ${new Date(todo.datetime).toLocaleString()})`
+                    ).join('\n');
+
+                    const pendingCount = todos.filter(todo => !todo.completed).length;
+                    const completedCount = todos.filter(todo => todo.completed).length;
                     
-                    todos.forEach(todo => {
-                        const todoTime = new Date(todo.datetime);
-                        const timeDiff = todoTime - now;
-                        const hoursDiff = timeDiff / (1000 * 60 * 60);
-                        
-                        if (hoursDiff < 2 && hoursDiff > 0) {
-                            urgentCount++;
+                    const analysisPrompt = `请分析用户的待办事项并提供专业建议：
+
+当前待办事项 (共${todos.length}个):
+${todoSummary}
+
+统计数据：
+- 待完成: ${pendingCount} 个
+- 已完成: ${completedCount} 个
+
+请提供：
+1. 时间管理建议（优先级、时间安排）
+2. 任务分类建议
+3. 效率提升建议
+4. 任何风险提示
+
+请用清晰、有条理的中文回复，每个建议用emoji开头，保持简洁实用。`;
+
+                    try {
+                        const result = await this.generateResponse(analysisPrompt);
+                        if (result.success) {
+                            return {
+                                type: 'ai_enhanced',
+                                title: '🤖 AI智能分析',
+                                message: result.response,
+                                confidence: 0.95
+                            };
                         }
-                        
-                        if (this.isSameDay(todoTime, now)) {
-                            todayCount++;
-                        }
-                    });
+                    } catch (error) {
+                        console.error('分析失败:', error);
+                    }
+
+                    return this.getLocalSuggestions(todos);
+                }
+
+                // 本地建议（API不可用时的备选）
+                getLocalSuggestions(todos) {
+                    const now = new Date();
+                    const pendingTodos = todos.filter(todo => !todo.completed);
                     
-                    if (urgentCount > 0) {
-                        this.suggestions.push({
-                            type: 'time_management',
-                            title: '⏰ 紧急提醒',
-                            message: `您有${urgentCount}个任务将在2小时内到期，建议优先处理`,
+                    if (pendingTodos.length === 0) {
+                        return {
+                            type: 'encouragement',
+                            title: '🎉 恭喜！',
+                            message: '您目前没有待办事项，继续保持高效！',
                             confidence: 0.9
-                        });
+                        };
                     }
-                    
-                    if (todayCount >= 5) {
-                        this.suggestions.push({
-                            type: 'time_management',
-                            title: '📅 任务密集',
-                            message: `今天有${todayCount}个待办事项，建议合理安排时间`,
-                            confidence: 0.7
-                        });
-                    }
-                }
 
-                analyzeCategorization(todos) {
-                    const categories = {};
-                    const keywords = {
-                        '会议': ['会议', '开会', '讨论'],
-                        '学习': ['学习', '阅读', '复习', '作业'],
-                        '工作': ['工作', '项目', '报告', '任务'],
-                        '生活': ['购物', '健身', '打扫', '预约']
-                    };
-                    
-                    todos.forEach(todo => {
-                        Object.keys(keywords).forEach(category => {
-                            keywords[category].forEach(keyword => {
-                                if (todo.text.includes(keyword)) {
-                                    categories[category] = (categories[category] || 0) + 1;
-                                }
-                            });
-                        });
-                    });
-                    
-                    Object.keys(categories).forEach(category => {
-                        if (categories[category] >= 3) {
-                            this.suggestions.push({
-                                type: 'categorization',
-                                title: '🏷️ 分类建议',
-                                message: `检测到多个"${category}"相关任务，建议集中处理`,
-                                confidence: 0.8
-                            });
-                        }
-                    });
-                }
-
-                analyzePriority(todos, now) {
-                    const highPriority = todos.filter(todo => {
+                    const urgentCount = pendingTodos.filter(todo => {
                         const todoTime = new Date(todo.datetime);
-                        const timeDiff = todoTime - now;
-                        return timeDiff < 24 * 60 * 60 * 1000; // 24小时内
-                    });
-                    
-                    if (highPriority.length >= 3) {
-                        this.suggestions.push({
-                            type: 'priority',
-                            title: '🚨 高优先级',
-                            message: `有${highPriority.length}个任务将在24小时内到期，建议优先安排`,
-                            confidence: 0.85
-                        });
-                    }
-                }
+                        return (todoTime - now) < 2 * 60 * 60 * 1000; // 2小时内
+                    }).length;
 
-                isSameDay(date1, date2) {
-                    return date1.getFullYear() === date2.getFullYear() &&
-                           date1.getMonth() === date2.getMonth() &&
-                           date1.getDate() === date2.getDate();
+                    if (urgentCount > 0) {
+                        return {
+                            type: 'urgent',
+                            title: '⏰ 紧急提醒',
+                            message: `您有${urgentCount}个任务将在2小时内到期，建议立即处理！`,
+                            confidence: 0.9
+                        };
+                    }
+
+                    const todayCount = pendingTodos.filter(todo => {
+                        const todoTime = new Date(todo.datetime);
+                        return todoTime.toDateString() === now.toDateString();
+                    }).length;
+
+                    if (todayCount >= 3) {
+                        return {
+                            type: 'today',
+                            title: '📅 今日任务',
+                            message: `今天有${todayCount}个待办事项，请合理安排时间。`,
+                            confidence: 0.7
+                        };
+                    }
+
+                    return {
+                        type: 'normal',
+                        title: '👍 进度良好',
+                        message: '您的任务安排合理，请按计划执行。',
+                        confidence: 0.6
+                    };
                 }
             }
 
-            // 智能助手界面管理
-            class AIAssistant {
+            // AI助手UI管理器
+            class AIChatManager {
                 constructor() {
-                    this.aiService = new AIService();
-                    this.setupAIAssistant();
+                    this.aiService = new DeepSeekAIService();
+                    this.setupAIChat();
                 }
 
-                setupAIAssistant() {
-                    // 创建AI助手按钮
-                    this.createAIBtn();
+                setupAIChat() {
+                    // 修改智能助手面板，添加API配置
+                    this.modifyChatPanel();
                     
-                    // 创建AI助手面板
-                    this.createAIPanel();
-                    
-                    // 创建API配置面板
-                    this.createAPIConfigPanel();
+                    // 监听消息发送
+                    this.setupMessageHandlers();
                 }
 
-                createAIBtn() {
-                    const aiBtn = document.createElement('button');
-                    aiBtn.id = 'aiAssistantBtn';
-                    aiBtn.innerHTML = '🤖 AI助手';
+                modifyChatPanel() {
+                    const chatPanel = document.querySelector('.todo-page'); // 根据你的HTML结构调整
                     
-                    Object.assign(aiBtn.style, {
-                        position: 'fixed',
-                        bottom: '20px',
-                        right: '20px',
-                        zIndex: '1000',
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                        border: 'none',
-                        borderRadius: '25px',
-                        color: 'white',
-                        padding: '10px 20px',
-                        fontSize: '14px',
-                        fontWeight: 'bold',
-                        cursor: 'pointer',
-                        boxShadow: '0 4px 15px rgba(102, 126, 234, 0.5)',
-                        width: 'auto',
-                        height: 'auto',
-                        minWidth: '100px',
-                        maxWidth: '150px',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis'
-                    });
-                    
-                    aiBtn.addEventListener('click', () => {
-                        this.toggleAIPanel();
-                    });
+                    if (!chatPanel) {
+                        console.warn('未找到聊天面板');
+                        setTimeout(() => this.modifyChatPanel(), 1000);
+                        return;
+                    }
 
-                    document.body.appendChild(aiBtn);
-                }
-
-                createAIPanel() {
-                    const aiPanel = document.createElement('div');
-                    aiPanel.id = 'aiAssistantPanel';
-                    
-                    Object.assign(aiPanel.style, {
-                        position: 'fixed',
-                        top: '50%',
-                        left: '50%',
-                        transform: 'translate(-50%, -50%)',
-                        width: '80%',
-                        maxWidth: '600px',
-                        backgroundColor: 'rgba(20, 20, 40, 0.98)',
-                        border: '2px solid #4169e1',
-                        borderRadius: '10px',
-                        padding: '20px',
-                        zIndex: '1001',
-                        display: 'none',
-                        color: '#e0e0ff',
-                        boxShadow: '0 0 30px rgba(65, 105, 225, 0.3)',
-                        backdropFilter: 'blur(10px)'
-                    });
-                    
-                    const isAPIEnabled = !!DEEPSEEK_CONFIG.apiKey;
-                    const apiStatus = isAPIEnabled ? 
-                        '<span style="color: #4CAF50; font-size: 12px;">● 已连接</span>' : 
-                        '<span style="color: #ff6b6b; font-size: 12px;">● 未连接</span>';
-                    
-                    aiPanel.innerHTML = `
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                            <div>
-                                <h2 style="margin: 0; color: #8a2be2; font-size: 20px;">🤖 智能助手</h2>
-                                <div style="font-size: 12px; color: #888; margin-top: 5px;">
-                                    ${apiStatus} 
-                                    <button id="configureAPI" style="
-                                        background: transparent;
-                                        border: 1px solid #4169e1;
-                                        color: #4169e1;
-                                        padding: 2px 8px;
-                                        border-radius: 3px;
-                                        cursor: pointer;
-                                        font-size: 10px;
-                                        margin-left: 10px;
-                                    ">配置API</button>
-                                </div>
-                            </div>
-                            <button id="closeAIPanel" style="
-                                background: rgba(65, 105, 225, 0.2);
-                                border: 1px solid #4169e1;
-                                color: #e0e0ff;
-                                padding: 8px 15px;
-                                border-radius: 5px;
-                                cursor: pointer;
-                                font-size: 12px;
-                                transition: all 0.3s;
-                            ">关闭</button>
-                        </div>
-                        
-                        <div id="suggestionsList" style="margin-bottom: 20px;">
-                            <h3 style="color: #4169e1; margin-bottom: 10px; font-size: 16px;">💡 智能建议</h3>
-                            <div id="suggestionsContainer" style="max-height: 300px; overflow-y: auto;"></div>
-                        </div>
-                        
-                        <div id="aiChatSection" style="margin-top: 20px;">
-                            <h3 style="color: #8a2be2; margin-bottom: 10px; font-size: 16px;">💬 AI聊天 (DeepSeek)</h3>
-                            <div style="margin-bottom: 10px;">
-                                <input type="text" id="aiQueryInput" placeholder="问我关于待办事项的任何问题..." style="
-                                    width: 100%;
-                                    padding: 10px;
-                                    background: rgba(30, 30, 60, 0.8);
-                                    border: 1px solid rgba(65, 105, 225, 0.3);
-                                    border-radius: 5px;
-                                    color: #e0e0ff;
-                                    margin-bottom: 10px;
-                                ">
-                                <button id="sendQueryBtn" style="
-                                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                                    border: none;
-                                    color: white;
-                                    padding: 8px 20px;
-                                    border-radius: 5px;
-                                    cursor: pointer;
-                                    width: 100%;
-                                ">发送</button>
-                            </div>
-                            <div id="chatMessages" style="
-                                max-height: 200px;
-                                overflow-y: auto;
-                                padding: 10px;
-                                background: rgba(20, 20, 40, 0.8);
-                                border-radius: 5px;
-                                border: 1px solid rgba(65, 105, 225, 0.2);
-                            "></div>
+                    // 添加API状态显示
+                    const apiStatus = document.createElement('div');
+                    apiStatus.className = 'api-status';
+                    apiStatus.innerHTML = `
+                        <div style="display: flex; align-items: center; gap: 8px; padding: 5px 10px; background: ${this.aiService.isConnected ? 'rgba(76, 175, 80, 0.1)' : 'rgba(244, 67, 54, 0.1)'}; border-radius: 4px; font-size: 12px;">
+                            <span style="width: 8px; height: 8px; border-radius: 50%; background: ${this.aiService.isConnected ? '#4CAF50' : '#F44336'};"></span>
+                            ${this.aiService.isConnected ? 'DeepSeek API 已连接' : 'DeepSeek API 未连接'}
+                            <button id="configureApiBtn" style="margin-left: auto; padding: 2px 8px; font-size: 10px; background: transparent; border: 1px solid #666; border-radius: 3px; color: #ccc; cursor: pointer;">
+                                配置
+                            </button>
                         </div>
                     `;
 
-                    document.body.appendChild(aiPanel);
-                    
-                    // 添加事件监听
-                    document.getElementById('closeAIPanel').addEventListener('click', () => {
-                        this.hideAIPanel();
-                    });
-                    
-                    document.getElementById('sendQueryBtn').addEventListener('click', () => {
-                        this.handleQuery();
-                    });
-                    
-                    document.getElementById('configureAPI').addEventListener('click', () => {
-                        this.showAPIConfigPanel();
-                    });
-                    
-                    document.getElementById('aiQueryInput').addEventListener('keypress', (e) => {
-                        if (e.key === 'Enter') {
-                            this.handleQuery();
-                        }
-                    });
-                    
-                    document.addEventListener('keydown', (e) => {
-                        if (e.key === 'Escape') {
-                            this.hideAIPanel();
-                        }
-                    });
-                    
-                    aiPanel.addEventListener('click', (e) => {
-                        if (e.target === aiPanel) {
-                            this.hideAIPanel();
-                        }
-                    });
+                    // 插入到面板顶部
+                    const header = chatPanel.querySelector('h2')?.parentElement;
+                    if (header) {
+                        header.parentNode.insertBefore(apiStatus, header.nextSibling);
+                    }
+
+                    // 添加配置面板
+                    this.createConfigPanel();
                 }
 
-                createAPIConfigPanel() {
+                createConfigPanel() {
                     const configPanel = document.createElement('div');
                     configPanel.id = 'apiConfigPanel';
-                    
-                    Object.assign(configPanel.style, {
-                        position: 'fixed',
-                        top: '50%',
-                        left: '50%',
-                        transform: 'translate(-50%, -50%)',
-                        width: '90%',
-                        maxWidth: '500px',
-                        backgroundColor: 'rgba(20, 20, 40, 0.98)',
-                        border: '2px solid #4CAF50',
-                        borderRadius: '10px',
-                        padding: '20px',
-                        zIndex: '1002',
-                        display: 'none',
-                        color: '#e0e0ff',
-                        boxShadow: '0 0 30px rgba(76, 175, 80, 0.3)',
-                        backdropFilter: 'blur(10px)'
-                    });
-                    
-                    const currentAPIKey = localStorage.getItem('deepseek_api_key') || DEEPSEEK_CONFIG.apiKey;
-                    
+                    configPanel.style.cssText = `
+                        position: fixed;
+                        top: 50%;
+                        left: 50%;
+                        transform: translate(-50%, -50%);
+                        width: 90%;
+                        max-width: 500px;
+                        background: rgba(20, 25, 40, 0.98);
+                        border: 2px solid #4169e1;
+                        border-radius: 10px;
+                        padding: 25px;
+                        z-index: 9999;
+                        display: none;
+                        color: #e0e0ff;
+                        box-shadow: 0 0 40px rgba(65, 105, 225, 0.4);
+                        backdrop-filter: blur(10px);
+                    `;
+
                     configPanel.innerHTML = `
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                            <h2 style="margin: 0; color: #4CAF50; font-size: 20px;">🔑 DeepSeek API 配置</h2>
-                            <button id="closeConfigPanel" style="
-                                background: rgba(76, 175, 80, 0.2);
-                                border: 1px solid #4CAF50;
-                                color: #e0e0ff;
-                                padding: 8px 15px;
-                                border-radius: 5px;
-                                cursor: pointer;
-                                font-size: 12px;
-                            ">关闭</button>
-                        </div>
-                        
                         <div style="margin-bottom: 20px;">
-                            <label style="display: block; margin-bottom: 8px; color: #aaa; font-size: 14px;">
-                                API Key
-                            </label>
-                            <input type="password" id="apiKeyInput" value="${currentAPIKey}" placeholder="输入您的DeepSeek API Key" style="
-                                width: 100%;
-                                padding: 12px;
-                                background: rgba(30, 30, 60, 0.8);
-                                border: 1px solid rgba(76, 175, 80, 0.3);
-                                border-radius: 5px;
-                                color: #e0e0ff;
-                                font-size: 14px;
-                            ">
-                            <div style="font-size: 12px; color: #888; margin-top: 8px;">
-                                获取API Key: 
-                                <a href="https://platform.deepseek.com/api_keys" target="_blank" style="color: #4CAF50;">
-                                    https://platform.deepseek.com/api_keys
-                                </a>
+                            <h3 style="color: #8a2be2; margin: 0 0 20px 0; font-size: 20px;">🔐 DeepSeek API 配置</h3>
+                            
+                            <div style="margin-bottom: 15px;">
+                                <label style="display: block; margin-bottom: 8px; color: #aaa; font-size: 14px;">
+                                    API Key
+                                </label>
+                                <input type="password" id="apiKeyInput" 
+                                    value="${this.aiService.apiKey || ''}"
+                                    placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                                    style="width: 100%; padding: 12px; background: rgba(30, 35, 50, 0.8); border: 1px solid #4169e1; border-radius: 6px; color: #fff; font-size: 14px;">
+                                <div style="font-size: 12px; color: #888; margin-top: 8px;">
+                                    🔑 获取API Key: 
+                                    <a href="https://platform.deepseek.com/api_keys" target="_blank" 
+                                       style="color: #4CAF50; text-decoration: none;">
+                                        https://platform.deepseek.com/api_keys
+                                    </a>
+                                </div>
+                            </div>
+                            
+                            <div style="margin-bottom: 20px;">
+                                <label style="display: block; margin-bottom: 8px; color: #aaa; font-size: 14px;">
+                                    模型选择
+                                </label>
+                                <select id="modelSelect" style="width: 100%; padding: 12px; background: rgba(30, 35, 50, 0.8); border: 1px solid #4169e1; border-radius: 6px; color: #fff;">
+                                    <option value="deepseek-chat">deepseek-chat (通用聊天)</option>
+                                    <option value="deepseek-coder">deepseek-coder (编程专用)</option>
+                                </select>
+                            </div>
+                            
+                            <div id="testResult" style="margin-bottom: 20px; padding: 10px; border-radius: 6px; display: none;"></div>
+                            
+                            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                                <button id="testApiBtn" style="padding: 10px 20px; background: rgba(33, 150, 243, 0.2); border: 1px solid #2196F3; color: #e0e0ff; border-radius: 6px; cursor: pointer;">
+                                    测试连接
+                                </button>
+                                <button id="saveApiBtn" style="padding: 10px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; color: white; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                                    保存配置
+                                </button>
+                                <button id="closeConfigBtn" style="padding: 10px 20px; background: rgba(120, 120, 120, 0.2); border: 1px solid #666; color: #ccc; border-radius: 6px; cursor: pointer;">
+                                    取消
+                                </button>
                             </div>
                         </div>
-                        
-                        <div style="margin-bottom: 20px;">
-                            <label style="display: block; margin-bottom: 8px; color: #aaa; font-size: 14px;">
-                                模型选择
-                            </label>
-                            <select id="modelSelect" style="
-                                width: 100%;
-                                padding: 12px;
-                                background: rgba(30, 30, 60, 0.8);
-                                border: 1px solid rgba(76, 175, 80, 0.3);
-                                border-radius: 5px;
-                                color: #e0e0ff;
-                                font-size: 14px;
-                            ">
-                                <option value="deepseek-chat" ${DEEPSEEK_CONFIG.model === 'deepseek-chat' ? 'selected' : ''}>deepseek-chat</option>
-                                <option value="deepseek-coder" ${DEEPSEEK_CONFIG.model === 'deepseek-coder' ? 'selected' : ''}>deepseek-coder</option>
-                            </select>
-                        </div>
-                        
-                        <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                            <button id="testAPIButton" style="
-                                background: rgba(33, 150, 243, 0.2);
-                                border: 1px solid #2196F3;
-                                color: #e0e0ff;
-                                padding: 10px 20px;
-                                border-radius: 5px;
-                                cursor: pointer;
-                                font-size: 14px;
-                            ">测试连接</button>
-                            <button id="saveAPIButton" style="
-                                background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
-                                border: none;
-                                color: white;
-                                padding: 10px 20px;
-                                border-radius: 5px;
-                                cursor: pointer;
-                                font-size: 14px;
-                                font-weight: bold;
-                            ">保存配置</button>
-                        </div>
-                        
-                        <div id="testResult" style="
-                            margin-top: 20px;
-                            padding: 10px;
-                            border-radius: 5px;
-                            display: none;
-                        "></div>
                     `;
 
                     document.body.appendChild(configPanel);
-                    
-                    // 配置面板事件监听
-                    document.getElementById('closeConfigPanel').addEventListener('click', () => {
-                        this.hideAPIConfigPanel();
+
+                    // 事件监听
+                    document.getElementById('configureApiBtn')?.addEventListener('click', () => {
+                        this.showConfigPanel();
                     });
-                    
-                    document.getElementById('saveAPIButton').addEventListener('click', () => {
-                        this.saveAPIConfig();
+
+                    document.getElementById('closeConfigBtn')?.addEventListener('click', () => {
+                        this.hideConfigPanel();
                     });
-                    
-                    document.getElementById('testAPIButton').addEventListener('click', () => {
-                        this.testAPIConnection();
+
+                    document.getElementById('saveApiBtn')?.addEventListener('click', () => {
+                        this.saveConfig();
                     });
-                    
-                    configPanel.addEventListener('click', (e) => {
-                        if (e.target === configPanel) {
-                            this.hideAPIConfigPanel();
-                        }
+
+                    document.getElementById('testApiBtn')?.addEventListener('click', () => {
+                        this.testConnection();
                     });
                 }
 
-                showAPIConfigPanel() {
+                showConfigPanel() {
                     const panel = document.getElementById('apiConfigPanel');
-                    panel.style.display = 'block';
+                    if (panel) panel.style.display = 'block';
                 }
 
-                hideAPIConfigPanel() {
+                hideConfigPanel() {
                     const panel = document.getElementById('apiConfigPanel');
-                    panel.style.display = 'none';
+                    if (panel) panel.style.display = 'none';
                 }
 
-                async saveAPIConfig() {
+                async saveConfig() {
                     const apiKey = document.getElementById('apiKeyInput').value.trim();
                     const model = document.getElementById('modelSelect').value;
                     
@@ -2246,345 +2079,216 @@ ${JSON.stringify(todos, null, 2)}
                         return;
                     }
                     
-                    // 保存到localStorage
-                    localStorage.setItem('deepseek_api_key', apiKey);
+                    this.aiService.setApiKey(apiKey);
                     localStorage.setItem('deepseek_model', model);
+                    DEEPSEEK_API_CONFIG.model = model;
                     
-                    // 更新全局配置
-                    DEEPSEEK_CONFIG.apiKey = apiKey;
-                    DEEPSEEK_CONFIG.model = model;
+                    // 更新状态显示
+                    this.updateApiStatus();
+                    this.hideConfigPanel();
                     
-                    // 显示成功消息
-                    const testResult = document.getElementById('testResult');
-                    testResult.style.display = 'block';
-                    testResult.style.background = 'rgba(76, 175, 80, 0.2)';
-                    testResult.style.border = '1px solid #4CAF50';
-                    testResult.style.color = '#4CAF50';
-                    testResult.innerHTML = '✅ 配置保存成功！';
-                    
-                    // 刷新AI面板状态
-                    setTimeout(() => {
-                        this.hideAPIConfigPanel();
-                        this.hideAIPanel();
-                        setTimeout(() => this.showAIPanel(), 100);
-                    }, 1500);
+                    alert('配置保存成功！');
                 }
 
-                async testAPIConnection() {
+                async testConnection() {
                     const apiKey = document.getElementById('apiKeyInput').value.trim();
-                    const testResult = document.getElementById('testResult');
-                    
                     if (!apiKey) {
-                        testResult.style.display = 'block';
-                        testResult.style.background = 'rgba(244, 67, 54, 0.2)';
-                        testResult.style.border = '1px solid #F44336';
-                        testResult.style.color = '#F44336';
-                        testResult.innerHTML = '❌ 请输入API Key进行测试';
+                        this.showTestResult('请输入API Key', false);
                         return;
                     }
                     
+                    const testResult = document.getElementById('testResult');
                     testResult.style.display = 'block';
+                    testResult.textContent = '正在测试连接...';
                     testResult.style.background = 'rgba(255, 193, 7, 0.2)';
-                    testResult.style.border = '1px solid #FFC107';
                     testResult.style.color = '#FFC107';
-                    testResult.innerHTML = '🔄 正在测试连接...';
                     
-                    try {
-                        const response = await fetch(`${DEEPSEEK_CONFIG.baseUrl}/models`, {
-                            method: 'GET',
-                            headers: {
-                                'Authorization': `Bearer ${apiKey}`
-                            }
-                        });
+                    const tempService = new DeepSeekAIService();
+                    tempService.setApiKey(apiKey);
+                    
+                    const result = await tempService.testConnection();
+                    
+                    this.showTestResult(result.message, result.success);
+                }
+
+                showTestResult(message, isSuccess) {
+                    const testResult = document.getElementById('testResult');
+                    testResult.style.display = 'block';
+                    testResult.textContent = message;
+                    testResult.style.background = isSuccess ? 
+                        'rgba(76, 175, 80, 0.2)' : 'rgba(244, 67, 54, 0.2)';
+                    testResult.style.color = isSuccess ? '#4CAF50' : '#F44336';
+                    testResult.style.border = isSuccess ? 
+                        '1px solid #4CAF50' : '1px solid #F44336';
+                }
+
+                updateApiStatus() {
+                    const statusElement = document.querySelector('.api-status');
+                    if (statusElement) {
+                        const dot = statusElement.querySelector('span');
+                        const text = statusElement.querySelector('span:not([style])') || statusElement.childNodes[1];
                         
-                        if (response.ok) {
-                            testResult.style.background = 'rgba(76, 175, 80, 0.2)';
-                            testResult.style.border = '1px solid #4CAF50';
-                            testResult.style.color = '#4CAF50';
-                            testResult.innerHTML = '✅ 连接测试成功！API Key有效。';
-                        } else {
-                            throw new Error(`API返回错误: ${response.status}`);
-                        }
-                    } catch (error) {
-                        testResult.style.background = 'rgba(244, 67, 54, 0.2)';
-                        testResult.style.border = '1px solid #F44336';
-                        testResult.style.color = '#F44336';
-                        testResult.innerHTML = `❌ 连接测试失败: ${error.message}`;
+                        if (dot) dot.style.background = this.aiService.isConnected ? '#4CAF50' : '#F44336';
+                        if (text) text.textContent = this.aiService.isConnected ? 
+                            'DeepSeek API 已连接' : 'DeepSeek API 未连接';
+                        
+                        statusElement.style.background = this.aiService.isConnected ? 
+                            'rgba(76, 175, 80, 0.1)' : 'rgba(244, 67, 54, 0.1)';
                     }
                 }
 
-                toggleAIPanel() {
-                    const panel = document.getElementById('aiAssistantPanel');
-                    if (panel.style.display === 'block') {
-                        this.hideAIPanel();
-                    } else {
-                        this.showAIPanel();
-                    }
-                }
-
-                showAIPanel() {
-                    const panel = document.getElementById('aiAssistantPanel');
-                    panel.style.display = 'block';
-                    this.updateSuggestions();
-                }
-
-                hideAIPanel() {
-                    const panel = document.getElementById('aiAssistantPanel');
-                    panel.style.display = 'none';
-                }
-
-                async updateSuggestions() {
-                    const todos = JSON.parse(localStorage.getItem('todos')) || [];
-                    const suggestionsContainer = document.getElementById('suggestionsContainer');
+                setupMessageHandlers() {
+                    const sendBtn = document.getElementById('sendQueryBtn');
+                    const input = document.getElementById('aiQueryInput');
                     
-                    // 显示加载中
-                    suggestionsContainer.innerHTML = `
-                        <div style="text-align: center; padding: 20px; color: #888;">
-                            <div style="margin-bottom: 10px;">🔄 分析中...</div>
-                            <div style="font-size: 12px;">${DEEPSEEK_CONFIG.apiKey ? '正在调用DeepSeek API...' : '使用本地分析...'}</div>
-                        </div>
+                    if (!sendBtn || !input) {
+                        console.warn('未找到发送按钮或输入框');
+                        setTimeout(() => this.setupMessageHandlers(), 1000);
+                        return;
+                    }
+
+                    const originalHandler = sendBtn.onclick;
+                    
+                    sendBtn.onclick = async () => {
+                        const question = input.value.trim();
+                        if (!question) return;
+                        
+                        input.value = '';
+                        
+                        // 显示用户消息
+                        this.addMessage('user', question);
+                        
+                        // 显示AI正在思考
+                        const thinkingMsg = this.addMessage('ai', '🤔 正在思考...');
+                        
+                        try {
+                            // 获取待办事项上下文
+                            const todos = JSON.parse(localStorage.getItem('todos')) || [];
+                            const todoContext = todos.length > 0 ? 
+                                `待办事项：\n${todos.map(t => `- ${t.text} (${t.completed ? '已完成' : '未完成'})`).join('\n')}` : 
+                                '目前没有待办事项';
+                            
+                            // 调用AI服务
+                            const result = await this.aiService.generateResponse(question, todoContext);
+                            
+                            // 更新消息
+                            thinkingMsg.textContent = result.response;
+                            
+                            // 如果API失败，提供本地建议
+                            if (!result.success && !this.aiService.isConnected) {
+                                const suggestion = this.aiService.getLocalSuggestions(todos);
+                                thinkingMsg.textContent = `⚠️ API未连接，使用本地建议：\n\n${suggestion.message}`;
+                            }
+                        } catch (error) {
+                            thinkingMsg.textContent = `❌ 出错了: ${error.message}`;
+                        }
+                    };
+
+                    // Enter键发送
+                    input.onkeypress = (e) => {
+                        if (e.key === 'Enter') {
+                            sendBtn.click();
+                        }
+                    };
+                }
+
+                addMessage(role, content) {
+                    const chatMessages = document.getElementById('chatMessages');
+                    if (!chatMessages) return null;
+                    
+                    const messageDiv = document.createElement('div');
+                    messageDiv.style.cssText = `
+                        margin: 10px 0;
+                        padding: 10px 15px;
+                        border-radius: 10px;
+                        max-width: 80%;
+                        word-wrap: break-word;
+                        background: ${role === 'user' ? 'rgba(65, 105, 225, 0.3)' : 'rgba(138, 43, 226, 0.3)'};
+                        ${role === 'user' ? 'margin-left: auto;' : ''}
+                        border: 1px solid ${role === 'user' ? 'rgba(65, 105, 225, 0.5)' : 'rgba(138, 43, 226, 0.5)'};
                     `;
                     
+                    messageDiv.textContent = content;
+                    chatMessages.appendChild(messageDiv);
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                    
+                    return messageDiv;
+                }
+
+                // 智能建议功能
+                async updateSuggestions() {
+                    const suggestionsContainer = document.getElementById('suggestionsList');
+                    if (!suggestionsContainer) return;
+                    
+                    const todos = JSON.parse(localStorage.getItem('todos')) || [];
+                    
+                    // 显示加载中
+                    const loadingDiv = document.createElement('div');
+                    loadingDiv.textContent = '🔄 正在分析任务...';
+                    suggestionsContainer.innerHTML = '';
+                    suggestionsContainer.appendChild(loadingDiv);
+                    
                     try {
-                        const suggestions = await this.aiService.analyzeTodos(todos);
+                        const suggestion = await this.aiService.analyzeTodos(todos);
                         
-                        suggestionsContainer.innerHTML = '';
+                        const suggestionDiv = document.createElement('div');
+                        suggestionDiv.style.cssText = `
+                            background: ${suggestion.type === 'ai_enhanced' ? 
+                                'rgba(138, 43, 226, 0.1)' : 'rgba(65, 105, 225, 0.1)'};
+                            border-left: 4px solid ${suggestion.type === 'ai_enhanced' ? 
+                                '#8a2be2' : '#4169e1'};
+                            padding: 15px;
+                            border-radius: 8px;
+                            margin: 10px 0;
+                        `;
                         
-                        if (suggestions.length === 0) {
-                            suggestionsContainer.innerHTML = '<p style="color: #888; text-align: center; padding: 20px;">暂无建议，一切正常！</p>';
-                            return;
-                        }
-                        
-                        suggestions.forEach(suggestion => {
-                            const suggestionEl = document.createElement('div');
-                            Object.assign(suggestionEl.style, {
-                                background: suggestion.type === 'ai_enhanced' ? 
-                                    'rgba(138, 43, 226, 0.1)' : 
-                                    'rgba(65, 105, 225, 0.1)',
-                                borderRadius: '8px',
-                                padding: '10px',
-                                marginBottom: '10px',
-                                borderLeft: suggestion.type === 'ai_enhanced' ? 
-                                    '3px solid #8a2be2' : 
-                                    '3px solid #4169e1',
-                                transition: 'all 0.3s'
-                            });
-                            
-                            suggestionEl.innerHTML = `
-                                <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <strong style="color: #e0e0ff; font-size: 14px;">${suggestion.title}</strong>
-                                    ${suggestion.type === 'ai_enhanced' ? 
-                                        '<span style="font-size: 10px; color: #8a2be2; background: rgba(138, 43, 226, 0.2); padding: 2px 6px; border-radius: 3px;">AI增强</span>' : 
-                                        ''}
-                                </div>
-                                <p style="margin: 5px 0 0 0; color: #aaa; font-size: 12px; white-space: pre-wrap;">${suggestion.message}</p>
-                            `;
-                            
-                            suggestionEl.addEventListener('mouseenter', () => {
-                                suggestionEl.style.background = suggestion.type === 'ai_enhanced' ? 
-                                    'rgba(138, 43, 226, 0.2)' : 
-                                    'rgba(65, 105, 225, 0.2)';
-                            });
-                            
-                            suggestionEl.addEventListener('mouseleave', () => {
-                                suggestionEl.style.background = suggestion.type === 'ai_enhanced' ? 
-                                    'rgba(138, 43, 226, 0.1)' : 
-                                    'rgba(65, 105, 225, 0.1)';
-                            });
-                            
-                            suggestionsContainer.appendChild(suggestionEl);
-                        });
-                    } catch (error) {
-                        suggestionsContainer.innerHTML = `
-                            <div style="color: #ff6b6b; text-align: center; padding: 20px;">
-                                <p>分析失败: ${error.message}</p>
-                                <button onclick="window.location.reload()" style="
-                                    background: rgba(255, 107, 107, 0.2);
-                                    border: 1px solid #ff6b6b;
-                                    color: #ff6b6b;
-                                    padding: 5px 10px;
-                                    border-radius: 3px;
-                                    cursor: pointer;
-                                    font-size: 12px;
-                                    margin-top: 10px;
-                                ">重试</button>
+                        suggestionDiv.innerHTML = `
+                            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                                <strong style="color: #e0e0ff; font-size: 16px;">${suggestion.title}</strong>
+                                ${suggestion.type === 'ai_enhanced' ? 
+                                    '<span style="font-size: 10px; background: rgba(138, 43, 226, 0.3); padding: 2px 8px; border-radius: 10px; color: #d8a0ff;">AI增强</span>' : 
+                                    ''}
+                            </div>
+                            <div style="color: #aaa; font-size: 14px; line-height: 1.5; white-space: pre-wrap;">
+                                ${suggestion.message}
                             </div>
                         `;
-                    }
-                }
-
-                async handleQuery() {
-                    const input = document.getElementById('aiQueryInput');
-                    const query = input.value.trim();
-                    const messages = document.getElementById('chatMessages');
-                    
-                    if (!query) return;
-                    
-                    // 添加用户消息
-                    this.addMessage('user', query);
-                    input.value = '';
-                    
-                    // 禁用发送按钮
-                    const sendBtn = document.getElementById('sendQueryBtn');
-                    sendBtn.disabled = true;
-                    sendBtn.innerHTML = '思考中...';
-                    
-                    try {
-                        const todos = JSON.parse(localStorage.getItem('todos')) || [];
                         
-                        if (!DEEPSEEK_CONFIG.apiKey) {
-                            // 使用本地响应
-                            setTimeout(() => {
-                                const response = this.generateLocalResponse(query, todos);
-                                this.addMessage('ai', response);
-                                sendBtn.disabled = false;
-                                sendBtn.innerHTML = '发送';
-                            }, 500);
-                        } else {
-                            // 使用DeepSeek API
-                            const systemPrompt = `你是一个专业的时间管理和待办事项助手。请根据用户的待办事项列表回答问题。
-
-当前待办事项:
-${JSON.stringify(todos, null, 2)}
-
-用户问题: ${query}
-
-请用专业、有帮助的中文回答，如果涉及具体任务，请提供具体建议。`;
-
-                            const aiResponse = await this.aiService.callDeepSeekAPI([
-                                { role: 'system', content: '你是一个专业的时间管理和生产力助手，用中文回答。' },
-                                { role: 'user', content: systemPrompt }
-                            ]);
-                            
-                            this.addMessage('ai', aiResponse || '抱歉，暂时无法回答这个问题。');
-                            sendBtn.disabled = false;
-                            sendBtn.innerHTML = '发送';
-                        }
+                        suggestionsContainer.innerHTML = '';
+                        suggestionsContainer.appendChild(suggestionDiv);
+                        
                     } catch (error) {
-                        console.error('处理查询时出错:', error);
-                        this.addMessage('ai', '抱歉，AI服务暂时不可用。');
-                        sendBtn.disabled = false;
-                        sendBtn.innerHTML = '发送';
+                        console.error('更新建议失败:', error);
+                        suggestionsContainer.innerHTML = '<div style="color: #ff6b6b;">获取建议失败，请稍后重试</div>';
                     }
-                }
-                
-                generateLocalResponse(query, todos) {
-                    const lowercaseQuery = query.toLowerCase();
-                    const pendingTodos = todos.filter(todo => !todo.completed);
-                    
-                    if (lowercaseQuery.includes('今天') || lowercaseQuery.includes('今日')) {
-                        return this.getTodaySummary(pendingTodos);
-                    } else if (lowercaseQuery.includes('明天') || lowercaseQuery.includes('明日')) {
-                        return this.getTomorrowSummary(pendingTodos);
-                    } else if (lowercaseQuery.includes('紧急') || lowercaseQuery.includes('重要')) {
-                        return this.getUrgentTasks(pendingTodos);
-                    } else if (lowercaseQuery.includes('所有') || lowercaseQuery.includes('全部')) {
-                        return this.getAllTasksSummary(todos);
-                    } else {
-                        return this.getGeneralResponse(pendingTodos);
-                    }
-                }
-                
-                getTodaySummary(todos) {
-                    const now = new Date();
-                    const todayCount = todos.filter(todo => 
-                        this.isSameDay(new Date(todo.datetime), now)
-                    ).length;
-                    
-                    return `今天您有${todayCount}个待办事项需要处理`;
-                }
-                
-                getTomorrowSummary(todos) {
-                    const now = new Date();
-                    const tomorrow = new Date(now);
-                    tomorrow.setDate(tomorrow.getDate() + 1);
-                    
-                    const tomorrowCount = todos.filter(todo => 
-                        this.isSameDay(new Date(todo.datetime), tomorrow)
-                    ).length;
-                    
-                    return `明天您有${tomorrowCount}个待办事项需要准备`;
-                }
-                
-                getUrgentTasks(todos) {
-                    const now = new Date();
-                    const urgentCount = todos.filter(todo => {
-                        const timeDiff = new Date(todo.datetime) - now;
-                        return timeDiff < 24 * 60 * 60 * 1000;
-                    }).length;
-                    
-                    return `您有${urgentCount}个紧急任务需要在24小时内完成`;
-                }
-                
-                getAllTasksSummary(todos) {
-                    const total = todos.length;
-                    const completed = todos.filter(todo => todo.completed).length;
-                    const pending = total - completed;
-                    
-                    return `总计${total}个任务，已完成${completed}个，剩余${pending}个待办`;
-                }
-                
-                getGeneralResponse(todos) {
-                    const pending = todos.length;
-                    
-                    if (pending === 0) {
-                        return '🎉 恭喜！您目前没有待办事项，可以好好休息了！';
-                    } else if (pending <= 3) {
-                        return '👍 您的待办事项不多，继续保持！';
-                    } else if (pending <= 7) {
-                        return '💪 任务量适中，建议合理安排时间完成';
-                    } else {
-                        return '🚨 任务较多，建议优先处理重要紧急的事项';
-                    }
-                }
-                
-                isSameDay(date1, date2) {
-                    return date1.getFullYear() === date2.getFullYear() &&
-                           date1.getMonth() === date2.getMonth() &&
-                           date1.getDate() === date2.getDate();
-                }
-
-                addMessage(sender, text) {
-                    const messages = document.getElementById('chatMessages');
-                    const messageEl = document.createElement('div');
-                    Object.assign(messageEl.style, {
-                        marginBottom: '10px',
-                        padding: '8px 12px',
-                        borderRadius: '10px',
-                        maxWidth: '80%',
-                        wordWrap: 'break-word'
-                    });
-                    
-                    if (sender === 'user') {
-                        Object.assign(messageEl.style, {
-                            background: 'rgba(65, 105, 225, 0.3)',
-                            marginLeft: 'auto',
-                            marginRight: '0'
-                        });
-                    } else {
-                        Object.assign(messageEl.style, {
-                            background: 'rgba(138, 43, 226, 0.3)',
-                            marginLeft: '0',
-                            marginRight: 'auto'
-                        });
-                    }
-                    
-                    messageEl.innerHTML = text;
-                    messages.appendChild(messageEl);
-                    messages.scrollTop = messages.scrollHeight;
                 }
             }
 
-            // 初始化时加载保存的API配置
-            const savedAPIKey = localStorage.getItem('deepseek_api_key');
-            const savedModel = localStorage.getItem('deepseek_model');
-            if (savedAPIKey) DEEPSEEK_CONFIG.apiKey = savedAPIKey;
-            if (savedModel) DEEPSEEK_CONFIG.model = savedModel;
-
-            // 在现有代码中添加AI助手初始化
+            // 初始化AI聊天管理器
+            let aiChatManager = null;
+            
+            // 等待页面加载完成后初始化
             setTimeout(() => {
-                new AIAssistant();
-            }, 1000);
+                aiChatManager = new AIChatManager();
+                
+                // 修改待办事项更新，同时更新AI建议
+                const originalRenderTodos = window.renderTodos;
+                if (originalRenderTodos) {
+                    window.renderTodos = function() {
+                        originalRenderTodos();
+                        if (aiChatManager) {
+                            aiChatManager.updateSuggestions();
+                        }
+                    };
+                }
+                
+                // 初始加载建议
+                setTimeout(() => {
+                    aiChatManager.updateSuggestions();
+                }, 2000);
+                
+            }, 1500);
+
         });
     </script>
 </body>
